@@ -38,7 +38,8 @@ Before you begin, ensure you have:
 - **npm** or **yarn** package manager
 - **Git** for version control
 - **Hedera Testnet Account** - [Get one here](https://portal.hedera.com/)
-- **HashPack Wallet** - [Install here](https://www.hashpack.app/)
+- **Hedera Wallet** - [HashPack](https://www.hashpack.app/), [Blade](https://bladewallet.io/), or [Kabila](https://kabila.app/)
+- **WalletConnect Project ID** - [Get one here](https://cloud.walletconnect.com/)
 
 ### 1. Clone the Repository
 
@@ -77,6 +78,12 @@ Edit `.env` with your Hedera credentials:
 HEDERA_NETWORK=testnet
 HEDERA_ACCOUNT_ID=0.0.YOUR_ACCOUNT_ID
 HEDERA_PRIVATE_KEY=YOUR_PRIVATE_KEY_HERE
+```
+
+Edit `frontend/.env.local` with your WalletConnect configuration:
+```env
+NEXT_PUBLIC_HEDERA_NETWORK=testnet
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your-walletconnect-project-id
 ```
 
 ### 4. Compile and Deploy Smart Contract
