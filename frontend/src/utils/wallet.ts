@@ -11,7 +11,7 @@ import {
   TransactionId
 } from '@hashgraph/sdk';
 
-import { HederaWalletConnect } from '@hashgraph/hedera-wallet-connect';
+// import { HederaWalletConnect } from '@hashgraph/hedera-wallet-connect';
 
 import {
   WalletConnection,
