@@ -1,0 +1,38 @@
+{
+  "name": "hedera-counter-dapp",
+  "version": "1.0.0",
+  "description": "A complete educational Hedera blockchain project with smart contract and frontend",
+  "main": "index.js",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm start",
+    "deploy-contract": "cd smart-contract && node scripts/deploy.js",
+    "compile-contract": "cd smart-contract && npx hardhat compile",
+    "test-contract": "cd smart-contract && npx hardhat test",
+    "setup": "npm run setup-contract && npm run setup-frontend",
+    "setup-contract": "cd smart-contract && npm install",
+    "setup-frontend": "cd frontend && npm install"
+  },
+  "keywords": [
+    "hedera",
+    "blockchain",
+    "smart-contract",
+    "dapp",
+    "solidity",
+    "react",
+    "nextjs",
+    "web3",
+    "hashpack"
+  ],
+  "author": "Hedera Developer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/hedera-counter-dapp.git"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "hedera-counter-contract",
+  "version": "1.0.0",
+  "description": "Smart contract for Hedera Counter DApp",
+  "main": "index.js",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy": "node scripts/deploy.js",
+    "deploy:testnet": "HEDERA_NETWORK=testnet node scripts/deploy.js",
+    "verify": "node scripts/verify.js",
+    "clean": "npx hardhat clean"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "hardhat": "^2.19.0",
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0"
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "^2.40.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.8.0"
+  },
+  "keywords": [
+    "hedera",
+    "smart-contract",
+    "solidity",
+    "blockchain"
+  ],
+  "author": "Hedera Developer",
+  "license": "MIT"
+}
