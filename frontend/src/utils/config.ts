@@ -7,7 +7,7 @@ import { HederaNetwork, AppConfig } from '@/types';
 // Environment variables with fallbacks
 export const ENV = {
   HEDERA_NETWORK: (process.env.NEXT_PUBLIC_HEDERA_NETWORK as HederaNetwork) || 'testnet',
-  CONTRACT_ID: process.env.NEXT_PUBLIC_CONTRACT_ID || '',
+  CONTRACT_ID: process.env.NEXT_PUBLIC_CONTRACT_ID || '0.0.6285476',
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Hedera Counter DApp',
   MIRROR_NODE_URL: process.env.NEXT_PUBLIC_MIRROR_NODE_URL || '',
   WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-project-id',
@@ -115,6 +115,14 @@ export const getNetworkConfig = (network: HederaNetwork = ENV.HEDERA_NETWORK) =>
 export const getExplorerUrl = (network: HederaNetwork, type: 'transaction' | 'contract' | 'account', id: string) => {
   const baseUrl = getNetworkConfig(network).explorerUrl;
   return `${baseUrl}/${type}/${id}`;
+};
+
+export const getContractExplorerUrl = (contractId: string, network: HederaNetwork = ENV.HEDERA_NETWORK) => {
+  return getExplorerUrl(network, 'contract', contractId);
+};
+
+export const getTransactionExplorerUrl = (transactionId: string, network: HederaNetwork = ENV.HEDERA_NETWORK) => {
+  return getExplorerUrl(network, 'transaction', transactionId);
 };
 
 export const getMirrorNodeUrl = (network: HederaNetwork = ENV.HEDERA_NETWORK) => {

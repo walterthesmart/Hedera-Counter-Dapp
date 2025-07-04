@@ -161,9 +161,11 @@ export interface DecrementByFormData {
 export interface UseWalletReturn {
   wallet: WalletConnection | null;
   connect: () => Promise<void>;
-  disconnect: () => void;
+  disconnect: () => Promise<void>;
   isConnecting: boolean;
   error: string | null;
+  isConnected: boolean;
+  isHashPackAvailable: boolean;
 }
 
 export interface UseContractReturn {

@@ -4,13 +4,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { WalletConnection, UseWalletReturn } from '@/types';
-import { 
-  getWalletManager, 
-  saveWalletConnection, 
-  loadWalletConnection, 
-  clearWalletConnection,
-  formatWalletError 
-} from '@/utils/wallet';
+import {
+  hashPackWallet,
+  connectHashPack,
+  disconnectHashPack,
+  getHashPackConnection,
+  isHashPackConnected
+} from '@/utils/hashpack';
 import { SUCCESS_MESSAGES } from '@/utils/config';
 
 export const useWallet = (): UseWalletReturn => {
@@ -18,90 +18,67 @@ export const useWallet = (): UseWalletReturn => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const walletManager = getWalletManager();
-
   // Load saved wallet connection on mount
   useEffect(() => {
-    const savedWallet = loadWalletConnection();
-    if (savedWallet) {
+    const savedWallet = getHashPackConnection();
+    if (savedWallet && savedWallet.isConnected) {
       setWallet(savedWallet);
-      // Optionally validate the connection
-      validateConnection(savedWallet);
     }
   }, []);
 
-  // Validate wallet connection
-  const validateConnection = async (walletConnection: WalletConnection) => {
-    try {
-      const isValid = await walletManager.validateConnection();
-      if (!isValid) {
-        // Connection is no longer valid, clear it
-        disconnect();
-      }
-    } catch (error) {
-      console.error('Wallet validation failed:', error);
-      disconnect();
-    }
-  };
+  // Check if HashPack is available
+  const isHashPackAvailable = useCallback(() => {
+    return hashPackWallet.isAvailable();
+  }, []);
 
-  // Connect to wallet via WalletConnect
+  // Connect to HashPack wallet
   const connect = useCallback(async () => {
+    if (!isHashPackAvailable()) {
+      setError('HashPack wallet is not installed. Please install the HashPack browser extension.');
+      return;
+    }
+
     setIsConnecting(true);
     setError(null);
 
     try {
-      const connection = await walletManager.connect();
+      const connection = await connectHashPack();
       setWallet(connection);
-      saveWalletConnection(connection);
 
-      // Show success message (you might want to use a toast library)
+      // Show success message
       console.log(SUCCESS_MESSAGES.WALLET_CONNECTED);
     } catch (error) {
-      const errorMessage = formatWalletError(error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to HashPack wallet';
       setError(errorMessage);
-      console.error('Wallet connection failed:', error);
+      console.error('HashPack connection failed:', error);
     } finally {
       setIsConnecting(false);
     }
-  }, [walletManager]);
+  }, [isHashPackAvailable]);
 
-  // Disconnect from wallet
+  // Disconnect from HashPack wallet
   const disconnect = useCallback(async () => {
     try {
-      await walletManager.disconnect();
+      await disconnectHashPack();
       setWallet(null);
-      clearWalletConnection();
       setError(null);
-      
+
       // Show success message
-      console.log(SUCCESS_MESSAGES.WALLET_DISCONNECTED);
+      console.log('HashPack wallet disconnected successfully');
     } catch (error) {
-      console.error('Wallet disconnect failed:', error);
+      console.error('HashPack disconnect failed:', error);
+      // Even if disconnect fails, clear the local state
+      setWallet(null);
     }
-  }, [walletManager]);
-
-  // Auto-connect if wallet was previously connected
-  useEffect(() => {
-    const autoConnect = async () => {
-      const savedWallet = loadWalletConnection();
-      if (savedWallet && !wallet && !isConnecting) {
-        try {
-          await connect();
-        } catch (error) {
-          // Auto-connect failed, user will need to manually connect
-          console.log('Auto-connect failed, manual connection required');
-        }
-      }
-    };
-
-    autoConnect();
-  }, [connect, wallet, isConnecting]);
+  }, []);
 
   return {
     wallet,
-    connect,
-    disconnect,
     isConnecting,
     error,
+    connect,
+    disconnect,
+    isConnected: !!wallet?.isConnected,
+    isHashPackAvailable: isHashPackAvailable(),
   };
 };

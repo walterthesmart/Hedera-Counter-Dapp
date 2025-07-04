@@ -11,7 +11,52 @@ import {
   TransactionId
 } from '@hashgraph/sdk';
 
+// Temporarily disabled due to ES module issues
 // import { HederaWalletConnect } from '@hashgraph/hedera-wallet-connect';
+
+// Mock HederaWalletConnect class for development
+class MockHederaWalletConnect {
+  private isConnected = false;
+  private accountData: any = null;
+
+  constructor(projectId: string, network: string, appName: string) {
+    console.log('Mock WalletConnect initialized:', { projectId, network, appName });
+  }
+
+  async connect() {
+    console.log('Mock wallet connecting...');
+    // Simulate connection delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    this.isConnected = true;
+    this.accountData = {
+      accountId: '0.0.6255971',
+      network: 'testnet',
+      isConnected: true
+    };
+
+    console.log('Mock wallet connected:', this.accountData);
+    return this.accountData;
+  }
+
+  async disconnect() {
+    console.log('Mock wallet disconnecting...');
+    this.isConnected = false;
+    this.accountData = null;
+    console.log('Mock wallet disconnected');
+  }
+
+  getAccountData() {
+    return this.accountData;
+  }
+
+  isWalletConnected() {
+    return this.isConnected;
+  }
+}
+
+// Use mock implementation temporarily
+const HederaWalletConnect = MockHederaWalletConnect;
 
 import {
   WalletConnection,
@@ -45,9 +90,9 @@ export class HederaWalletConnectManager {
     try {
       // Initialize Hedera WalletConnect with project configuration
       this.walletConnect = new HederaWalletConnect(
-        ENV.WALLETCONNECT_PROJECT_ID,
+        ENV.WALLETCONNECT_PROJECT_ID || 'demo-project-id',
         APP_CONFIG.network === 'mainnet' ? 'mainnet' : 'testnet',
-        ENV.APP_NAME
+        ENV.APP_NAME || 'Hedera Counter DApp'
       );
 
       this.isInitialized = true;
@@ -72,25 +117,31 @@ export class HederaWalletConnectManager {
     }
 
     try {
-      // Open WalletConnect modal and connect
-      const session = await this.walletConnect!.openModal();
-      this.session = session;
+      console.log('🔗 Connecting to wallet...');
+      // Use mock connect method
+      const result = await this.walletConnect!.connect();
 
-      if (session && session.namespaces?.hedera?.accounts?.length > 0) {
-        // Extract account ID from the session
-        const accountString = session.namespaces.hedera.accounts[0];
-        const accountId = accountString.split(':')[2]; // Format: hedera:testnet:0.0.123456
+      this.session = {
+        accountId: result.accountId,
+        network: result.network as HederaNetwork,
+        isConnected: true,
+        connectedAt: new Date(),
+        walletType: 'walletconnect',
+        topic: 'mock-topic'
+      };
 
-        return {
-          accountId,
-          isConnected: true,
-          network: APP_CONFIG.network,
-        };
-      } else {
-        throw new Error('No accounts found in wallet session');
-      }
+      const connection: WalletConnection = {
+        accountId: result.accountId,
+        network: result.network as HederaNetwork,
+        isConnected: true,
+        walletType: 'walletconnect',
+        balance: '100.0' // Mock balance
+      };
+
+      console.log('✅ Wallet connected successfully:', connection);
+      return connection;
     } catch (error) {
-      console.error('WalletConnect connection error:', error);
+      console.error('❌ WalletConnect connection error:', error);
       throw new Error(ERROR_MESSAGES.WALLET_REJECTED);
     }
   }
@@ -101,10 +152,12 @@ export class HederaWalletConnectManager {
   async disconnect(): Promise<void> {
     if (this.walletConnect && this.session) {
       try {
-        await this.walletConnect.disconnect(this.session.topic);
+        console.log('🔌 Disconnecting wallet...');
+        await this.walletConnect.disconnect();
         this.session = null;
+        console.log('✅ Wallet disconnected successfully');
       } catch (error) {
-        console.error('WalletConnect disconnect error:', error);
+        console.error('❌ WalletConnect disconnect error:', error);
       }
     }
   }
