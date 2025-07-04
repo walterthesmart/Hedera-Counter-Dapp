@@ -3,8 +3,7 @@ const {
     AccountId,
     PrivateKey,
     ContractCreateFlow,
-    ContractFunctionParameters,
-    Hbar
+    ContractFunctionParameters
 } = require("@hashgraph/sdk");
 const fs = require("fs");
 const path = require("path");
@@ -29,7 +28,17 @@ async function main() {
     // Setup Hedera client
     const network = process.env.HEDERA_NETWORK || "testnet";
     const accountId = AccountId.fromString(process.env.HEDERA_ACCOUNT_ID);
-    const privateKey = PrivateKey.fromString(process.env.HEDERA_PRIVATE_KEY);
+
+    // Handle both hex and DER format private keys
+    let privateKey;
+    const privateKeyString = process.env.HEDERA_PRIVATE_KEY;
+    if (privateKeyString.startsWith('0x')) {
+        // Hex format - use fromStringECDSA for ECDSA keys
+        privateKey = PrivateKey.fromStringECDSA(privateKeyString);
+    } else {
+        // DER format
+        privateKey = PrivateKey.fromStringDer(privateKeyString);
+    }
 
     let client;
     if (network === "mainnet") {
@@ -60,14 +69,13 @@ async function main() {
 
         // Deploy the contract with initial count of 0
         console.log("⏳ Deploying Counter contract...");
-        
+
         const contractCreateTx = new ContractCreateFlow()
-            .setGas(300000) // Adjust gas limit as needed
+            .setGas(1000000) // Increased gas limit for deployment
             .setBytecode(contractBytecode)
             .setConstructorParameters(
                 new ContractFunctionParameters().addUint256(0) // Initial count = 0
-            )
-            .setMaxTransactionFee(new Hbar(2)); // Max fee for deployment
+            );
 
         const contractCreateSubmit = await contractCreateTx.execute(client);
         const contractCreateRx = await contractCreateSubmit.getReceipt(client);
