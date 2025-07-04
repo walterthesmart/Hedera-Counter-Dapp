@@ -10,7 +10,9 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@hashgraph/hedera-wallet-connect": "2.0.0-canary.811af2f.0",
     "@hashgraph/sdk": "^2.40.0",
+    "@walletconnect/modal": "^2.6.2",
     "@types/node": "20.8.0",
     "@types/react": "18.2.25",
     "@types/react-dom": "18.2.11",

@@ -1,106 +1,116 @@
 /**
  * Wallet integration utilities for Hedera wallets
- * Supports HashPack and other Hedera-compatible wallets
+ * Uses official Hedera WalletConnect implementation
  */
 
-import { 
-  AccountId, 
-  ContractExecuteTransaction, 
+import {
+  AccountId,
+  ContractExecuteTransaction,
   ContractFunctionParameters,
   Hbar,
   TransactionId
 } from '@hashgraph/sdk';
 
-import { 
-  WalletConnection, 
-  HederaNetwork, 
+import { HederaWalletConnect } from '@hashgraph/hedera-wallet-connect';
+
+import {
+  WalletConnection,
+  HederaNetwork,
   ContractCallResult,
-  HashPackProvider 
+  WalletConnectSession,
+  WalletConnectProvider
 } from '@/types';
 
-import { 
-  APP_CONFIG, 
-  CONTRACT_CONSTANTS, 
+import {
+  APP_CONFIG,
+  CONTRACT_CONSTANTS,
   ERROR_MESSAGES,
-  getNetworkConfig 
+  ENV,
+  getNetworkConfig
 } from './config';
 
-// HashPack wallet interface
-declare global {
-  interface Window {
-    hashpack?: HashPackProvider;
-  }
-}
-
 /**
- * HashPack wallet integration
+ * Hedera WalletConnect integration
  */
-export class HashPackWallet {
-  private provider: HashPackProvider | null = null;
+export class HederaWalletConnectManager {
+  private walletConnect: HederaWalletConnect | null = null;
+  private session: WalletConnectSession | null = null;
   private isInitialized = false;
 
   constructor() {
-    this.checkProvider();
+    this.initializeWalletConnect();
   }
 
-  private checkProvider(): void {
-    if (typeof window !== 'undefined' && window.hashpack) {
-      this.provider = window.hashpack;
+  private async initializeWalletConnect(): Promise<void> {
+    try {
+      // Initialize Hedera WalletConnect with project configuration
+      this.walletConnect = new HederaWalletConnect(
+        ENV.WALLETCONNECT_PROJECT_ID,
+        APP_CONFIG.network === 'mainnet' ? 'mainnet' : 'testnet',
+        ENV.APP_NAME
+      );
+
       this.isInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize WalletConnect:', error);
     }
   }
 
   /**
-   * Check if HashPack is installed
+   * Check if WalletConnect is available
    */
-  isInstalled(): boolean {
-    return this.isInitialized && this.provider !== null;
+  isAvailable(): boolean {
+    return this.isInitialized && this.walletConnect !== null;
   }
 
   /**
-   * Connect to HashPack wallet
+   * Connect to wallet via WalletConnect
    */
   async connect(): Promise<WalletConnection> {
-    if (!this.isInstalled()) {
-      throw new Error('HashPack wallet is not installed');
+    if (!this.isAvailable()) {
+      throw new Error('WalletConnect is not available');
     }
 
     try {
-      const result = await this.provider!.connectToLocalWallet();
-      
-      if (result.success && result.data) {
-        const accountId = result.data.accountIds[0];
-        const network = result.data.network as HederaNetwork;
-        
+      // Open WalletConnect modal and connect
+      const session = await this.walletConnect!.openModal();
+      this.session = session;
+
+      if (session && session.namespaces?.hedera?.accounts?.length > 0) {
+        // Extract account ID from the session
+        const accountString = session.namespaces.hedera.accounts[0];
+        const accountId = accountString.split(':')[2]; // Format: hedera:testnet:0.0.123456
+
         return {
           accountId,
           isConnected: true,
-          network,
+          network: APP_CONFIG.network,
         };
       } else {
-        throw new Error(result.error || 'Failed to connect to HashPack');
+        throw new Error('No accounts found in wallet session');
       }
     } catch (error) {
-      console.error('HashPack connection error:', error);
+      console.error('WalletConnect connection error:', error);
       throw new Error(ERROR_MESSAGES.WALLET_REJECTED);
     }
   }
 
   /**
-   * Disconnect from HashPack wallet
+   * Disconnect from wallet
    */
   async disconnect(): Promise<void> {
-    if (this.provider) {
+    if (this.walletConnect && this.session) {
       try {
-        await this.provider.disconnect();
+        await this.walletConnect.disconnect(this.session.topic);
+        this.session = null;
       } catch (error) {
-        console.error('HashPack disconnect error:', error);
+        console.error('WalletConnect disconnect error:', error);
       }
     }
   }
 
   /**
-   * Execute a contract transaction through HashPack
+   * Execute a contract transaction through WalletConnect
    */
   async executeTransaction(
     accountId: string,
@@ -110,8 +120,8 @@ export class HashPackWallet {
     gasLimit: number = CONTRACT_CONSTANTS.GAS_LIMIT,
     maxTransactionFee: number = CONTRACT_CONSTANTS.MAX_TRANSACTION_FEE
   ): Promise<ContractCallResult> {
-    if (!this.isInstalled()) {
-      throw new Error('HashPack wallet is not installed');
+    if (!this.isAvailable() || !this.session) {
+      throw new Error('WalletConnect is not connected');
     }
 
     try {
@@ -123,21 +133,19 @@ export class HashPackWallet {
         .setMaxTransactionFee(new Hbar(maxTransactionFee))
         .setTransactionId(TransactionId.generate(AccountId.fromString(accountId)));
 
-      // Convert transaction to bytes for HashPack
-      const transactionBytes = transaction.toBytes();
+      // Execute transaction through WalletConnect
+      const result = await this.walletConnect!.executeTransaction(
+        transaction,
+        accountId
+      );
 
-      // Send transaction through HashPack
-      const result = await this.provider!.sendTransaction({
-        transactionBytes: Array.from(transactionBytes),
-      });
-
-      if (result.success) {
+      if (result && result.transactionId) {
         return {
           success: true,
-          transactionId: result.response?.transactionId,
+          transactionId: result.transactionId.toString(),
         };
       } else {
-        throw new Error(result.error || 'Transaction failed');
+        throw new Error('Transaction execution failed');
       }
     } catch (error) {
       console.error('Transaction execution error:', error);
@@ -150,18 +158,18 @@ export class HashPackWallet {
 }
 
 /**
- * Wallet manager class to handle multiple wallet types
+ * Wallet manager class to handle WalletConnect integration
  */
 export class WalletManager {
-  private hashPack: HashPackWallet;
+  private walletConnect: HederaWalletConnectManager;
   private currentWallet: WalletConnection | null = null;
 
   constructor() {
-    this.hashPack = new HashPackWallet();
+    this.walletConnect = new HederaWalletConnectManager();
   }
 
   /**
-   * Get available wallets
+   * Get available wallets through WalletConnect
    */
   getAvailableWallets() {
     return [
@@ -169,24 +177,31 @@ export class WalletManager {
         name: 'HashPack',
         id: 'hashpack',
         icon: '/icons/hashpack.svg',
-        isInstalled: this.hashPack.isInstalled(),
+        isAvailable: true, // WalletConnect supports multiple wallets
         downloadUrl: 'https://www.hashpack.app/',
+      },
+      {
+        name: 'Blade Wallet',
+        id: 'blade',
+        icon: '/icons/blade.svg',
+        isAvailable: true,
+        downloadUrl: 'https://bladewallet.io/',
+      },
+      {
+        name: 'Kabila Wallet',
+        id: 'kabila',
+        icon: '/icons/kabila.svg',
+        isAvailable: true,
+        downloadUrl: 'https://kabila.app/',
       },
     ];
   }
 
   /**
-   * Connect to a specific wallet
+   * Connect to wallet via WalletConnect
    */
-  async connect(walletId: string = 'hashpack'): Promise<WalletConnection> {
-    switch (walletId) {
-      case 'hashpack':
-        this.currentWallet = await this.hashPack.connect();
-        break;
-      default:
-        throw new Error(`Unsupported wallet: ${walletId}`);
-    }
-
+  async connect(): Promise<WalletConnection> {
+    this.currentWallet = await this.walletConnect.connect();
     return this.currentWallet;
   }
 
@@ -195,7 +210,7 @@ export class WalletManager {
    */
   async disconnect(): Promise<void> {
     if (this.currentWallet) {
-      await this.hashPack.disconnect();
+      await this.walletConnect.disconnect();
       this.currentWallet = null;
     }
   }
@@ -221,7 +236,7 @@ export class WalletManager {
       throw new Error(ERROR_MESSAGES.WALLET_NOT_CONNECTED);
     }
 
-    return await this.hashPack.executeTransaction(
+    return await this.walletConnect.executeTransaction(
       this.currentWallet.accountId,
       contractId,
       functionName,
@@ -326,15 +341,37 @@ export const isWalletAvailable = (): boolean => {
  */
 export const getWalletInstallInstructions = () => {
   return {
+    general: {
+      name: 'Hedera Wallets',
+      description: 'Connect with any Hedera-compatible wallet',
+      downloadUrl: 'https://hedera.com/ecosystem',
+      instructions: [
+        'Install a Hedera-compatible wallet (HashPack, Blade, Kabila)',
+        'Create or import your wallet',
+        'Ensure you have testnet HBAR for transactions',
+        'Click "Connect Wallet" to connect via WalletConnect',
+      ],
+    },
     hashpack: {
       name: 'HashPack',
       description: 'The most popular Hedera wallet',
       downloadUrl: 'https://www.hashpack.app/',
       instructions: [
         'Visit hashpack.app',
+        'Download the browser extension or mobile app',
+        'Create or import your wallet',
+        'Connect via WalletConnect',
+      ],
+    },
+    blade: {
+      name: 'Blade Wallet',
+      description: 'Feature-rich Hedera wallet',
+      downloadUrl: 'https://bladewallet.io/',
+      instructions: [
+        'Visit bladewallet.io',
         'Download the browser extension',
         'Create or import your wallet',
-        'Connect to this dApp',
+        'Connect via WalletConnect',
       ],
     },
   };

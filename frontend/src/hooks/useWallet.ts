@@ -44,16 +44,16 @@ export const useWallet = (): UseWalletReturn => {
     }
   };
 
-  // Connect to wallet
-  const connect = useCallback(async (walletId: string = 'hashpack') => {
+  // Connect to wallet via WalletConnect
+  const connect = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      const connection = await walletManager.connect(walletId);
+      const connection = await walletManager.connect();
       setWallet(connection);
       saveWalletConnection(connection);
-      
+
       // Show success message (you might want to use a toast library)
       console.log(SUCCESS_MESSAGES.WALLET_CONNECTED);
     } catch (error) {

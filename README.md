@@ -24,7 +24,7 @@ This project demonstrates:
 ### Frontend Features
 - ✅ Modern, responsive UI with Tailwind CSS
 - ✅ Real-time counter value display with progress visualization
-- ✅ Wallet connection with HashPack support
+- ✅ Multi-wallet support via Hedera WalletConnect (HashPack, Blade, Kabila, etc.)
 - ✅ Transaction history and status tracking
 - ✅ Error handling and user feedback
 - ✅ Mobile-friendly design

@@ -10,6 +10,7 @@ export const ENV = {
   CONTRACT_ID: process.env.NEXT_PUBLIC_CONTRACT_ID || '',
   APP_NAME: process.env.NEXT_PUBLIC_APP_NAME || 'Hedera Counter DApp',
   MIRROR_NODE_URL: process.env.NEXT_PUBLIC_MIRROR_NODE_URL || '',
+  WALLETCONNECT_PROJECT_ID: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'demo-project-id',
 } as const;
 
 // Network configurations

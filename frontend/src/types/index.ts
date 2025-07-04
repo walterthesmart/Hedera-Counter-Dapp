@@ -97,21 +97,36 @@ export interface AppConfig {
   appName: string;
 }
 
-// Wallet Provider Types (for HashPack and other wallets)
+// Wallet Provider Types (for WalletConnect and other wallets)
 export interface WalletProvider {
   name: string;
   icon: string;
-  isInstalled: boolean;
+  isAvailable: boolean;
   connect: () => Promise<WalletConnection>;
   disconnect: () => Promise<void>;
   signTransaction: (transaction: any) => Promise<any>;
 }
 
-// HashPack specific types
-export interface HashPackProvider {
-  connectToLocalWallet: () => Promise<any>;
-  sendTransaction: (transaction: any) => Promise<any>;
+// WalletConnect specific types
+export interface WalletConnectSession {
+  topic: string;
+  peer: {
+    metadata: {
+      name: string;
+      description: string;
+      url: string;
+      icons: string[];
+    };
+  };
+  namespaces: Record<string, any>;
+}
+
+export interface WalletConnectProvider {
+  connect: () => Promise<WalletConnectSession>;
   disconnect: () => Promise<void>;
+  request: (params: any) => Promise<any>;
+  on: (event: string, callback: Function) => void;
+  off: (event: string, callback: Function) => void;
 }
 
 // Mirror Node API Types
