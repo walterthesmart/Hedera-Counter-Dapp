@@ -12,6 +12,7 @@ import { ERROR_MESSAGES } from './config';
  * Hedera contract IDs (0.0.xxxxx) map to EVM addresses
  */
 export const hederaContractIdToEvmAddress = (contractId: string): string => {
+  console.log('🔍 Converting Hedera contract ID to EVM address:', contractId);
   // Extract the contract number from the Hedera ID (0.0.xxxxx)
   const parts = contractId.split('.');
   if (parts.length !== 3 || parts[0] !== '0' || parts[1] !== '0') {
@@ -26,7 +27,9 @@ export const hederaContractIdToEvmAddress = (contractId: string): string => {
   // Convert to EVM address format (20 bytes, padded with zeros)
   // The contract number is stored in the last 8 bytes of the address
   const hexNum = contractNum.toString(16).padStart(16, '0');
-  return `0x${'0'.repeat(24)}${hexNum}`;
+  const evmAddress = `0x${'0'.repeat(24)}${hexNum}`;
+  console.log('🔍 Converted EVM address:', evmAddress);
+  return evmAddress;
 };
 
 // Hedera network configurations for MetaMask
@@ -56,7 +59,8 @@ export const HEDERA_NETWORKS: Record<Exclude<HederaNetwork, 'previewnet'>, any> 
 };
 
 export class MetaMaskWallet {
-  private provider: any = null;
+  private rawProvider: any = null;
+  private provider: ethers.BrowserProvider | null = null;
   private signer: ethers.Signer | null = null;
   private connection: WalletConnection | null = null;
 
@@ -72,8 +76,10 @@ export class MetaMaskWallet {
    */
   private async initializeProvider(): Promise<void> {
     try {
-      this.provider = await detectEthereumProvider();
-      if (this.provider && this.provider.isMetaMask) {
+      this.rawProvider = await detectEthereumProvider();
+      if (this.rawProvider && this.rawProvider.isMetaMask) {
+        // Wrap with ethers.js provider
+        this.provider = new ethers.BrowserProvider(this.rawProvider);
         // Set up event listeners
         this.setupEventListeners();
       }
@@ -86,10 +92,10 @@ export class MetaMaskWallet {
    * Set up MetaMask event listeners
    */
   private setupEventListeners(): void {
-    if (!this.provider) return;
+    if (!this.rawProvider) return;
 
     // Account changed
-    this.provider.on('accountsChanged', (accounts: string[]) => {
+    this.rawProvider.on('accountsChanged', (accounts: string[]) => {
       if (accounts.length === 0) {
         this.disconnect();
       } else {
@@ -98,14 +104,14 @@ export class MetaMaskWallet {
     });
 
     // Chain changed
-    this.provider.on('chainChanged', (chainId: string) => {
+    this.rawProvider.on('chainChanged', (chainId: string) => {
       console.log('Chain changed to:', chainId);
       // Reload the page to reset the dapp state
       window.location.reload();
     });
 
     // Disconnect
-    this.provider.on('disconnect', () => {
+    this.rawProvider.on('disconnect', () => {
       this.disconnect();
     });
   }
@@ -115,7 +121,7 @@ export class MetaMaskWallet {
    */
   isAvailable(): boolean {
     if (typeof window === 'undefined') return false;
-    return !!(this.provider && this.provider.isMetaMask);
+    return !!(this.rawProvider && this.rawProvider.isMetaMask);
   }
 
   /**
@@ -137,7 +143,7 @@ export class MetaMaskWallet {
    */
   async getChainId(): Promise<string | null> {
     try {
-      return await this.provider.request({ method: 'eth_chainId' });
+      return await this.rawProvider.request({ method: 'eth_chainId' });
     } catch (error) {
       console.error('Failed to get chain ID:', error);
       return null;
@@ -149,7 +155,7 @@ export class MetaMaskWallet {
    */
   async ensureCorrectNetwork(network: Exclude<HederaNetwork, 'previewnet'> = 'testnet'): Promise<void> {
     try {
-      const currentChainId = await this.provider.request({ method: 'eth_chainId' });
+      const currentChainId = await this.rawProvider.request({ method: 'eth_chainId' });
       const targetNetwork = HEDERA_NETWORKS[network];
 
       if (currentChainId !== targetNetwork.chainId) {
@@ -157,7 +163,7 @@ export class MetaMaskWallet {
 
         try {
           // Try to switch to the network
-          await this.provider.request({
+          await this.rawProvider.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: targetNetwork.chainId }],
           });
@@ -165,7 +171,7 @@ export class MetaMaskWallet {
           // If the network doesn't exist, add it
           if (switchError.code === 4902) {
             console.log(`Adding Hedera ${network} network to MetaMask`);
-            await this.provider.request({
+            await this.rawProvider.request({
               method: 'wallet_addEthereumChain',
               params: [targetNetwork],
             });
@@ -193,7 +199,7 @@ export class MetaMaskWallet {
       await this.ensureCorrectNetwork(network);
 
       // Request account access
-      const accounts = await this.provider.request({
+      const accounts = await this.rawProvider.request({
         method: 'eth_requestAccounts',
       });
 
@@ -204,12 +210,11 @@ export class MetaMaskWallet {
       // Switch to Hedera network
       await this.switchToHederaNetwork(network);
 
-      // Create ethers provider and signer
-      const ethersProvider = new ethers.BrowserProvider(this.provider);
-      this.signer = await ethersProvider.getSigner();
+      // Use the already created ethers provider and get signer
+      this.signer = await this.provider!.getSigner();
 
       // Get account balance
-      const balance = await ethersProvider.getBalance(accounts[0]);
+      const balance = await this.provider!.getBalance(accounts[0]);
       const balanceInHbar = ethers.formatEther(balance);
 
       // Convert Ethereum address to Hedera account ID format
@@ -242,7 +247,7 @@ export class MetaMaskWallet {
 
     try {
       // Try to switch to the network
-      await this.provider.request({
+      await this.rawProvider.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: networkConfig.chainId }],
       });
@@ -250,7 +255,7 @@ export class MetaMaskWallet {
       // If the network doesn't exist, add it
       if (switchError.code === 4902) {
         try {
-          await this.provider.request({
+          await this.rawProvider.request({
             method: 'wallet_addEthereumChain',
             params: [networkConfig],
           });
@@ -312,6 +317,25 @@ export class MetaMaskWallet {
    */
   getSigner(): ethers.Signer | null {
     return this.signer;
+  }
+
+  /**
+   * Get or create ethers provider
+   */
+  private async getEthersProvider(): Promise<ethers.BrowserProvider> {
+    if (!this.rawProvider) {
+      // Try to initialize if not already done
+      await this.initializeProvider();
+      if (!this.rawProvider) {
+        throw new Error('MetaMask not available');
+      }
+    }
+
+    if (!this.provider) {
+      this.provider = new ethers.BrowserProvider(this.rawProvider);
+    }
+
+    return this.provider;
   }
 
   /**
@@ -420,7 +444,9 @@ export class MetaMaskWallet {
   async isContractPaused(contractAddress: string): Promise<boolean> {
     try {
       const contractABI = this.getCounterContractABI();
-      const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
+      const provider = await this.getEthersProvider();
+      const signer = await provider.getSigner();
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
       return await contract.isPaused();
     } catch (error) {
       console.error('Failed to check contract pause status:', error);
@@ -433,17 +459,22 @@ export class MetaMaskWallet {
    */
   async getContractCount(contractAddress: string): Promise<number | null> {
     try {
-      console.log('🔍 getContractCount called for:', contractAddress);
+      console.log('🔍 getContractCount - Starting for address:', contractAddress);
       const contractABI = this.getCounterContractABI();
-      console.log('🔍 Contract ABI loaded, creating contract instance...');
-      const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
-      console.log('🔍 Contract instance created, calling getCount()...');
+      console.log('🔍 getContractCount - Getting ethers provider...');
+      const provider = await this.getEthersProvider();
+      console.log('🔍 getContractCount - Getting signer...');
+      const signer = await provider.getSigner();
+      console.log('🔍 getContractCount - Creating contract instance...');
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      console.log('🔍 getContractCount - Calling getCount()...');
       const count = await contract.getCount();
-      const countNumber = count.toNumber();
-      console.log('✅ Contract count retrieved successfully:', countNumber);
-      return countNumber;
+      console.log('🔍 getContractCount - Raw count result:', count, 'Type:', typeof count);
+      const result = Number(count);
+      console.log('🔍 getContractCount - Success! Count:', result);
+      return result;
     } catch (error) {
-      console.error('❌ Failed to get contract count:', error);
+      console.error('❌ getContractCount failed:', error);
       return null;
     }
   }
@@ -643,60 +674,58 @@ export class MetaMaskWallet {
    */
   async debugContractState(contractAddress: string): Promise<any> {
     try {
-      console.log('🔍 Starting debugContractState for:', contractAddress);
+      console.log('🔍 debugContractState - Contract address:', contractAddress);
       const contractABI = this.getCounterContractABI();
-      const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
+      console.log('🔍 debugContractState - ABI loaded, creating contract...');
 
-      console.log('🔍 Contract instance created, calling getContractInfo...');
+      // Get signer for contract calls
+      const provider = await this.getEthersProvider();
+      const signer = await provider.getSigner();
+      console.log('🔍 debugContractState - Signer obtained:', await signer.getAddress());
+
+      const contract = new ethers.Contract(contractAddress, contractABI, signer);
+      console.log('🔍 debugContractState - Contract instance created with signer');
 
       // Try to call getContractInfo
-      let debugInfo;
       try {
+        console.log('🔍 debugContractState - Calling getContractInfo...');
         const [count, owner, paused, maxCount, minCount] = await contract.getContractInfo();
+        console.log('🔍 debugContractState - getContractInfo result:', { count, owner, paused, maxCount, minCount });
 
-        debugInfo = {
+        return {
           contractAddress,
-          currentCount: count.toNumber(),
+          currentCount: Number(count),
           owner: owner,
           isPaused: paused,
-          maxCount: maxCount.toNumber(),
-          minCount: minCount.toNumber(),
+          maxCount: Number(maxCount),
+          minCount: Number(minCount),
           connectedAccount: this.connection?.accountId,
           network: this.connection?.network,
-          chainId: await this.provider.request({ method: 'eth_chainId' })
+          chainId: await this.rawProvider.request({ method: 'eth_chainId' })
         };
-        console.log('✅ getContractInfo succeeded:', debugInfo);
       } catch (contractInfoError) {
-        console.warn('❌ getContractInfo failed, trying individual calls:', contractInfoError);
-
+        console.log('🔍 debugContractState - getContractInfo failed:', contractInfoError);
+        console.log('🔍 debugContractState - Trying individual function calls...');
         // Fallback: try individual function calls
-        try {
-          const count = await contract.getCount();
-          const owner = await contract.getOwner();
-          const isPaused = await contract.isPaused();
+        const count = await contract.getCount();
+        const owner = await contract.getOwner();
+        const isPaused = await contract.isPaused();
+        console.log('🔍 debugContractState - Individual calls result:', { count, owner, isPaused });
 
-          debugInfo = {
-            contractAddress,
-            currentCount: count.toNumber(),
-            owner: owner,
-            isPaused: isPaused,
-            maxCount: 1000000, // Default values
-            minCount: 0,
-            connectedAccount: this.connection?.accountId,
-            network: this.connection?.network,
-            chainId: await this.provider.request({ method: 'eth_chainId' })
-          };
-          console.log('✅ Individual calls succeeded:', debugInfo);
-        } catch (individualError) {
-          console.error('❌ Individual calls also failed:', individualError);
-          throw individualError;
-        }
+        return {
+          contractAddress,
+          currentCount: Number(count),
+          owner: owner,
+          isPaused: isPaused,
+          maxCount: 1000000, // Default values
+          minCount: 0,
+          connectedAccount: this.connection?.accountId,
+          network: this.connection?.network,
+          chainId: await this.rawProvider.request({ method: 'eth_chainId' })
+        };
       }
-
-      console.log('🔍 Final Contract Debug Info:', debugInfo);
-      return debugInfo;
     } catch (error) {
-      console.error('❌ Failed to get contract debug info:', error);
+      console.error('Failed to get contract debug info:', error);
       return { error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

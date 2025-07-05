@@ -273,66 +273,6 @@ export default function Home() {
                 network={APP_CONFIG.network}
               />
 
-              {/* Debug Section */}
-              {wallet?.walletType === 'metamask' && (
-                <div className="card">
-                  <div className="card-header">
-                    <h3 className="text-lg font-semibold">Debug Information</h3>
-                  </div>
-                  <div className="card-content space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <strong>Contract ID:</strong> {APP_CONFIG.contractId}
-                      </div>
-                      <div>
-                        <strong>Network:</strong> {APP_CONFIG.network}
-                      </div>
-                      <div>
-                        <strong>Wallet:</strong> {wallet?.accountId}
-                      </div>
-                      <div>
-                        <strong>Contract State:</strong> {contract ? 'Loaded' : 'Not loaded'}
-                      </div>
-                      <div>
-                        <strong>Loading:</strong> {contractLoading ? 'Yes' : 'No'}
-                      </div>
-                      <div>
-                        <strong>Error:</strong> {contractError || 'None'}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          console.log('🔍 Manual refresh triggered');
-                          refresh();
-                        }}
-                        className="btn btn-secondary btn-sm"
-                      >
-                        Debug Refresh
-                      </button>
-                      <button
-                        onClick={async () => {
-                          console.log('🔍 Manual contract test triggered');
-                          try {
-                            const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
-                            const contractAddress = hederaContractIdToEvmAddress(APP_CONFIG.contractId);
-                            console.log('🔍 Testing contract at:', contractAddress);
-                            const count = await metaMaskWallet.getContractCount(contractAddress);
-                            console.log('🔍 Contract count result:', count);
-                            alert(`Contract count: ${count}`);
-                          } catch (error) {
-                            console.error('🔍 Manual test failed:', error);
-                            alert(`Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-                          }
-                        }}
-                        className="btn btn-primary btn-sm"
-                      >
-                        Test Contract
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Contract Information */}
               {contract && (
@@ -358,6 +298,35 @@ export default function Home() {
                       <span className="font-mono text-xs">
                         {contract.owner.slice(0, 6)}...{contract.owner.slice(-4)}
                       </span>
+                    </div>
+                  </div>
+
+                  {/* Contract Verification Links */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-3">Verify Contract</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={`https://hashscan.io/testnet/contract/${contract.contractId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-2 rounded-md text-xs bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        HashScan Explorer
+                      </a>
+                      <a
+                        href={`https://testnet.mirrornode.hedera.com/api/v1/contracts/${contract.contractId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center px-3 py-2 rounded-md text-xs bg-green-100 text-green-800 hover:bg-green-200 transition-colors"
+                      >
+                        <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Mirror Node API
+                      </a>
                     </div>
                   </div>
                 </div>

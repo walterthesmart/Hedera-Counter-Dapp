@@ -47,7 +47,7 @@ export const CounterDisplay: React.FC<CounterDisplayProps> = ({
           </div>
           {onRefresh && (
             <button
-              onClick={onRefresh}
+              onClick={() => onRefresh(true)}
               disabled={isLoading}
               className="btn btn-secondary btn-sm flex items-center space-x-2"
               title="Refresh contract state"

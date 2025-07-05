@@ -63,7 +63,7 @@ export interface CounterDisplayProps {
   isLoading?: boolean;
   maxCount?: number;
   minCount?: number;
-  onRefresh?: () => void;
+  onRefresh?: (force?: boolean) => void;
 }
 
 export interface WalletButtonProps {

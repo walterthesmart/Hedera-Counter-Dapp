@@ -21,15 +21,19 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
   }, [wallet, walletManager]);
 
   // Refresh contract information
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     if (!APP_CONFIG.contractId) {
       setError(ERROR_MESSAGES.CONTRACT_NOT_DEPLOYED);
       return;
     }
 
-    console.log('Loading contract info for:', APP_CONFIG.contractId, 'on network:', APP_CONFIG.network);
     setIsLoading(true);
     setError(null);
+
+    // If force refresh, clear current contract state first
+    if (force) {
+      setContract(null);
+    }
 
     try {
       let contractData = null;
@@ -37,34 +41,13 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       // If MetaMask is connected, use it to fetch real contract state
       if (wallet?.walletType === 'metamask' && wallet.isConnected) {
         try {
-          console.log('🦊 Fetching real contract state via MetaMask...');
-          console.log('🔍 Contract ID from config:', APP_CONFIG.contractId);
           const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
           const contractAddress = hederaContractIdToEvmAddress(APP_CONFIG.contractId);
-          console.log('🔍 Converted EVM address:', contractAddress);
-
-          // First, test if we can connect to the provider
-          try {
-            const connection = metaMaskWallet.getConnection();
-            console.log('🔍 MetaMask connection status:', connection);
-
-            // Check what network we're connected to
-            const chainId = await metaMaskWallet.getChainId();
-            console.log('🔍 Current chain ID:', chainId);
-            console.log('🔍 Expected Hedera testnet chain ID: 0x128 (296)');
-
-            if (chainId !== '0x128') {
-              console.warn('⚠️ MetaMask is not connected to Hedera testnet!');
-              console.warn('⚠️ Current chain:', chainId, 'Expected: 0x128');
-            }
-          } catch (providerError) {
-            console.error('❌ Provider connection failed:', providerError);
-          }
 
           // Get real contract state
-          console.log('🔍 Calling debugContractState for address:', contractAddress);
+          console.log('🔍 Querying contract at address:', contractAddress);
           const debugInfo = await metaMaskWallet.debugContractState(contractAddress);
-          console.log('🔍 debugContractState result:', debugInfo);
+          console.log('🔍 Contract query result:', debugInfo);
 
           if (debugInfo && !debugInfo.error) {
             contractData = {
@@ -75,14 +58,13 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
               maxCount: debugInfo.maxCount,
               minCount: debugInfo.minCount,
             };
-            console.log('✅ Real contract state loaded via MetaMask:', contractData);
+            console.log('✅ Contract state loaded via MetaMask:', contractData);
           } else {
-            console.warn('❌ Failed to get contract state via MetaMask:', debugInfo?.error);
-
+            console.log('❌ debugContractState failed, trying simple count method');
             // Try simpler approach - just get the count
-            console.log('🔄 Trying simpler getContractCount...');
             try {
               const count = await metaMaskWallet.getContractCount(contractAddress);
+              console.log('🔍 Simple count result:', count);
               if (count !== null) {
                 contractData = {
                   contractId: APP_CONFIG.contractId,
@@ -92,12 +74,11 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
                   maxCount: 1000000,
                   minCount: 0,
                 };
-                console.log('✅ Got count via simple method:', contractData);
               } else {
                 throw new Error('getContractCount returned null');
               }
             } catch (simpleError) {
-              console.error('❌ Simple count method also failed:', simpleError);
+              console.log('❌ Simple count method also failed:', simpleError);
               // Final fallback to mock data
               contractData = {
                 contractId: APP_CONFIG.contractId,
@@ -107,27 +88,24 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
                 maxCount: 1000000,
                 minCount: 0,
               };
-              console.log('🔄 Using final fallback contract data:', contractData);
+              console.log('🔄 Using MetaMask fallback data');
             }
           }
         } catch (metamaskError) {
-          console.warn('MetaMask contract query failed:', metamaskError);
+          console.warn('❌ MetaMask contract query failed:', metamaskError);
         }
       }
 
       // If MetaMask failed or not connected, try Hedera SDK
       if (!contractData) {
+        console.log('🔗 Trying Hedera SDK fallback...');
         try {
-          console.log('🔗 Attempting to load contract data via Hedera SDK...');
-
           // First, verify contract exists using Mirror Node
           const mirrorNodeUrl = `https://testnet.mirrornode.hedera.com/api/v1/contracts/${APP_CONFIG.contractId}`;
-          console.log('Checking contract existence via Mirror Node:', mirrorNodeUrl);
+          console.log('🔍 Checking Mirror Node:', mirrorNodeUrl);
 
           const mirrorResponse = await fetch(mirrorNodeUrl);
           if (mirrorResponse.ok) {
-            const mirrorData = await mirrorResponse.json();
-            console.log('Mirror Node contract data:', mirrorData);
 
             // Try to get the actual contract info using Hedera SDK
             const { getCounterValue, getContractOwner, isContractPaused } = await import('@/utils/hedera');
@@ -139,8 +117,6 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
               isContractPaused(APP_CONFIG.contractId, APP_CONFIG.network)
             ]);
 
-            console.log('Hedera SDK query results:', { count, owner, isPaused });
-
             // Use real data if available
             if (count.status === 'fulfilled' && count.value !== null) {
               contractData = {
@@ -151,17 +127,19 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
                 maxCount: 1000000,
                 minCount: 0,
               };
-              console.log('✅ Real contract state loaded via Hedera SDK:', contractData);
+              console.log('✅ Contract state loaded via Hedera SDK:', contractData);
+            } else {
+              console.log('❌ Hedera SDK queries failed:', { count, owner, isPaused });
             }
           }
         } catch (hederaError) {
-          console.warn('Hedera SDK contract query failed:', hederaError);
+          console.warn('❌ Hedera SDK contract query failed:', hederaError);
         }
       }
 
       // If all real queries failed, use fallback data
       if (!contractData) {
-        console.log('⚠️ Using fallback contract data - real queries failed');
+        console.log('⚠️ All contract queries failed, using fallback data');
         contractData = {
           contractId: APP_CONFIG.contractId,
           count: 0, // Default to 0 instead of hardcoded 42
@@ -173,7 +151,6 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       }
 
       setContract(contractData);
-      console.log('Contract state updated:', contractData);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -251,11 +228,13 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
         // Refresh contract state after successful transaction
         console.log('🔄 Transaction successful, refreshing contract state...');
 
-        // Immediate refresh for faster UI updates
-        refresh();
+        // Multiple refreshes to ensure we get the latest state
+        // Immediate force refresh to clear cached state
+        refresh(true);
 
-        // Also schedule a delayed refresh to ensure we get the latest state
-        setTimeout(refresh, 1000);
+        // Delayed refreshes to account for blockchain confirmation time
+        setTimeout(() => refresh(true), 2000);
+        setTimeout(() => refresh(true), 5000);
 
         // Return the result for transaction tracking
         return result;
