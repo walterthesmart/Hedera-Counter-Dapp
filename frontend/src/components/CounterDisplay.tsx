@@ -11,6 +11,7 @@ export const CounterDisplay: React.FC<CounterDisplayProps> = ({
   isLoading = false,
   maxCount = 1000000,
   minCount = 0,
+  onRefresh,
 }) => {
   // Calculate progress percentage
   const progress = maxCount > 0 ? (count / maxCount) * 100 : 0;
@@ -37,10 +38,25 @@ export const CounterDisplay: React.FC<CounterDisplayProps> = ({
   return (
     <div className="card text-center">
       <div className="card-header">
-        <h2 className="text-2xl font-bold gradient-text">Counter Value</h2>
-        <p className="text-gray-600 mt-2">
-          Current count on the Hedera blockchain
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold gradient-text">Counter Value</h2>
+            <p className="text-gray-600 mt-2">
+              Current count on the Hedera blockchain
+            </p>
+          </div>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="btn btn-secondary btn-sm flex items-center space-x-2"
+              title="Refresh contract state"
+            >
+              <RotateCcw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Counter Display */}
