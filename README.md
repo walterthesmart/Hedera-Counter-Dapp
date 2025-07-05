@@ -11,6 +11,12 @@ This project demonstrates:
 - **Real-time Updates**: Live contract state monitoring and transaction tracking
 - **Educational Content**: Comprehensive tutorials and explanations
 
+## 📸 Application Screenshot
+
+![Hedera Counter DApp Interface](https://github.com/user-attachments/assets/your-image-id-here)
+
+*The Hedera Counter DApp interface showing the counter value, transaction controls, contract verification links, and real-time transaction history.*
+
 ## 🌟 Features
 
 ### Smart Contract Features

@@ -165,7 +165,7 @@ export default function Home() {
 
               <div className="flex items-center space-x-4">
                 <a
-                  href="https://github.com/your-username/hedera-counter-dapp"
+                  href="https://github.com/walterthesmart/Hedera-Counter-Dapp"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-gray-600 hover:text-gray-900 transition-colors"
@@ -175,9 +175,11 @@ export default function Home() {
                 </a>
 
                 <a
-                  href="/docs"
+                  href="https://github.com/walterthesmart/Hedera-Counter-Dapp/blob/main/README.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-gray-600 hover:text-gray-900 transition-colors"
-                  title="Documentation"
+                  title="Project Documentation"
                 >
                   <BookOpen className="w-5 h-5" />
                 </a>
