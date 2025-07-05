@@ -32,60 +32,93 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     setError(null);
 
     try {
-      // Try to get real contract data first, fall back to mock if needed
-      console.log('Attempting to load real contract data...');
+      let contractData = null;
 
-      try {
-        // First, let's try to verify the contract exists using Mirror Node
-        const mirrorNodeUrl = `https://testnet.mirrornode.hedera.com/api/v1/contracts/${APP_CONFIG.contractId}`;
-        console.log('Checking contract existence via Mirror Node:', mirrorNodeUrl);
+      // If MetaMask is connected, use it to fetch real contract state
+      if (wallet?.walletType === 'metamask' && wallet.isConnected) {
+        try {
+          console.log('🦊 Fetching real contract state via MetaMask...');
+          const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
+          const contractAddress = hederaContractIdToEvmAddress(APP_CONFIG.contractId);
 
-        const mirrorResponse = await fetch(mirrorNodeUrl);
-        if (mirrorResponse.ok) {
-          const mirrorData = await mirrorResponse.json();
-          console.log('Mirror Node contract data:', mirrorData);
+          // Get real contract state
+          const debugInfo = await metaMaskWallet.debugContractState(contractAddress);
 
-          // Try to get the actual contract info
-          const { getCounterValue, getContractOwner, isContractPaused } = await import('@/utils/hedera');
-
-          // Get individual contract properties
-          const [count, owner, isPaused] = await Promise.allSettled([
-            getCounterValue(APP_CONFIG.contractId, APP_CONFIG.network),
-            getContractOwner(APP_CONFIG.contractId, APP_CONFIG.network),
-            isContractPaused(APP_CONFIG.contractId, APP_CONFIG.network)
-          ]);
-
-          console.log('Contract query results:', { count, owner, isPaused });
-
-          // Use real data if available, otherwise use sensible defaults
-          setContract({
-            contractId: APP_CONFIG.contractId,
-            count: count.status === 'fulfilled' && count.value !== null ? count.value : 42,
-            owner: owner.status === 'fulfilled' && owner.value ? owner.value : '0.0.6255971', // Use deployer account
-            isPaused: isPaused.status === 'fulfilled' ? isPaused.value : false,
-            maxCount: 1000000,
-            minCount: 0,
-          });
-
-          console.log('Real contract data loaded successfully');
-          return;
+          if (debugInfo && !debugInfo.error) {
+            contractData = {
+              contractId: APP_CONFIG.contractId,
+              count: debugInfo.currentCount,
+              owner: debugInfo.owner,
+              isPaused: debugInfo.isPaused,
+              maxCount: debugInfo.maxCount,
+              minCount: debugInfo.minCount,
+            };
+            console.log('✅ Real contract state loaded via MetaMask:', contractData);
+          }
+        } catch (metamaskError) {
+          console.warn('MetaMask contract query failed:', metamaskError);
         }
-      } catch (realContractError) {
-        console.log('Real contract query failed, using mock data:', realContractError);
       }
 
-      // Fallback to mock data with correct owner
-      console.log('Using mock contract data with correct owner...');
-      setContract({
-        contractId: APP_CONFIG.contractId,
-        count: 42, // Mock count
-        owner: '0.0.6255971', // Use the actual deployer account from deployment.json
-        isPaused: false,
-        maxCount: 1000000,
-        minCount: 0,
-      });
+      // If MetaMask failed or not connected, try Hedera SDK
+      if (!contractData) {
+        try {
+          console.log('🔗 Attempting to load contract data via Hedera SDK...');
 
-      console.log('Mock contract created with correct owner');
+          // First, verify contract exists using Mirror Node
+          const mirrorNodeUrl = `https://testnet.mirrornode.hedera.com/api/v1/contracts/${APP_CONFIG.contractId}`;
+          console.log('Checking contract existence via Mirror Node:', mirrorNodeUrl);
+
+          const mirrorResponse = await fetch(mirrorNodeUrl);
+          if (mirrorResponse.ok) {
+            const mirrorData = await mirrorResponse.json();
+            console.log('Mirror Node contract data:', mirrorData);
+
+            // Try to get the actual contract info using Hedera SDK
+            const { getCounterValue, getContractOwner, isContractPaused } = await import('@/utils/hedera');
+
+            // Get individual contract properties
+            const [count, owner, isPaused] = await Promise.allSettled([
+              getCounterValue(APP_CONFIG.contractId, APP_CONFIG.network),
+              getContractOwner(APP_CONFIG.contractId, APP_CONFIG.network),
+              isContractPaused(APP_CONFIG.contractId, APP_CONFIG.network)
+            ]);
+
+            console.log('Hedera SDK query results:', { count, owner, isPaused });
+
+            // Use real data if available
+            if (count.status === 'fulfilled' && count.value !== null) {
+              contractData = {
+                contractId: APP_CONFIG.contractId,
+                count: count.value,
+                owner: owner.status === 'fulfilled' && owner.value ? owner.value : '0.0.6255971',
+                isPaused: isPaused.status === 'fulfilled' ? isPaused.value : false,
+                maxCount: 1000000,
+                minCount: 0,
+              };
+              console.log('✅ Real contract state loaded via Hedera SDK:', contractData);
+            }
+          }
+        } catch (hederaError) {
+          console.warn('Hedera SDK contract query failed:', hederaError);
+        }
+      }
+
+      // If all real queries failed, use fallback data
+      if (!contractData) {
+        console.log('⚠️ Using fallback contract data - real queries failed');
+        contractData = {
+          contractId: APP_CONFIG.contractId,
+          count: 0, // Default to 0 instead of hardcoded 42
+          owner: '0.0.6255971', // Use the actual deployer account from deployment.json
+          isPaused: false,
+          maxCount: 1000000,
+          minCount: 0,
+        };
+      }
+
+      setContract(contractData);
+      console.log('Contract state updated:', contractData);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -94,7 +127,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [wallet]);
 
   // Load contract info on mount and when wallet changes
   useEffect(() => {
@@ -161,7 +194,13 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
         }
 
         // Refresh contract state after successful transaction
-        setTimeout(refresh, 2000);
+        console.log('🔄 Transaction successful, refreshing contract state...');
+
+        // Immediate refresh for faster UI updates
+        refresh();
+
+        // Also schedule a delayed refresh to ensure we get the latest state
+        setTimeout(refresh, 1000);
       } else {
         throw new Error(result?.error || 'Transaction failed');
       }
