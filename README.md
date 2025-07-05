@@ -13,7 +13,7 @@ This project demonstrates:
 
 ## 📸 Application Screenshot
 
-![Hedera Counter DApp Interface](https://github.com/user-attachments/assets/your-image-id-here)
+![Hedera Counter DApp Interface](./image.png)
 
 *The Hedera Counter DApp interface showing the counter value, transaction controls, contract verification links, and real-time transaction history.*
 
