@@ -7,6 +7,28 @@ import { ethers } from 'ethers';
 import { WalletConnection, HederaNetwork } from '@/types';
 import { ERROR_MESSAGES } from './config';
 
+/**
+ * Convert Hedera contract ID to EVM address
+ * Hedera contract IDs (0.0.xxxxx) map to EVM addresses
+ */
+export const hederaContractIdToEvmAddress = (contractId: string): string => {
+  // Extract the contract number from the Hedera ID (0.0.xxxxx)
+  const parts = contractId.split('.');
+  if (parts.length !== 3 || parts[0] !== '0' || parts[1] !== '0') {
+    throw new Error(`Invalid Hedera contract ID format: ${contractId}`);
+  }
+
+  const contractNum = parseInt(parts[2]);
+  if (isNaN(contractNum)) {
+    throw new Error(`Invalid contract number in ID: ${contractId}`);
+  }
+
+  // Convert to EVM address format (20 bytes, padded with zeros)
+  // The contract number is stored in the last 8 bytes of the address
+  const hexNum = contractNum.toString(16).padStart(16, '0');
+  return `0x${'0'.repeat(24)}${hexNum}`;
+};
+
 // Hedera network configurations for MetaMask
 export const HEDERA_NETWORKS: Record<Exclude<HederaNetwork, 'previewnet'>, any> = {
   testnet: {
@@ -292,6 +314,95 @@ export class MetaMaskWallet {
       console.error('Transaction signing failed:', error);
       throw new Error(error instanceof Error ? error.message : 'Transaction signing failed');
     }
+  }
+
+  /**
+   * Execute a smart contract function
+   */
+  async executeContract(
+    contractAddress: string,
+    functionName: string,
+    parameters: any[] = [],
+    gasLimit: number = 300000
+  ): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+    if (!this.signer || !this.connection?.isConnected) {
+      return {
+        success: false,
+        error: 'Wallet not connected. Please connect MetaMask first.'
+      };
+    }
+
+    try {
+      console.log(`Executing contract function: ${functionName} on ${contractAddress}`);
+
+      // For Hedera smart contracts, we need to use the contract's ABI
+      // Since we're working with a simple counter contract, we'll define the basic ABI
+      const contractABI = [
+        "function increment() external",
+        "function decrement() external",
+        "function incrementBy(uint256 amount) external",
+        "function decrementBy(uint256 amount) external",
+        "function getCount() external view returns (uint256)",
+        "function reset() external"
+      ];
+
+      // Create contract instance
+      const contract = new ethers.Contract(contractAddress, contractABI, this.signer);
+
+      // Execute the function
+      let tx;
+      if (parameters.length > 0) {
+        tx = await contract[functionName](...parameters, { gasLimit });
+      } else {
+        tx = await contract[functionName]({ gasLimit });
+      }
+
+      console.log('Transaction sent:', tx.hash);
+
+      // Wait for transaction confirmation
+      const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt.transactionHash);
+
+      return {
+        success: true,
+        transactionId: receipt.transactionHash
+      };
+
+    } catch (error) {
+      console.error('Contract execution failed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Contract execution failed'
+      };
+    }
+  }
+
+  /**
+   * Increment counter
+   */
+  async incrementCounter(contractAddress: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+    return await this.executeContract(contractAddress, 'increment');
+  }
+
+  /**
+   * Decrement counter
+   */
+  async decrementCounter(contractAddress: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+    return await this.executeContract(contractAddress, 'decrement');
+  }
+
+  /**
+   * Increment counter by amount
+   */
+  async incrementCounterBy(contractAddress: string, amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+    return await this.executeContract(contractAddress, 'incrementBy', [amount]);
+  }
+
+  /**
+   * Decrement counter by amount
+   */
+  async decrementCounterBy(contractAddress: string, amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
+    return await this.executeContract(contractAddress, 'decrementBy', [amount]);
   }
 }
 

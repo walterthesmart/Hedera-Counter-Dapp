@@ -315,6 +315,13 @@ export class WalletManager {
   }
 
   /**
+   * Set current wallet connection (for external wallet integrations)
+   */
+  setCurrentWallet(wallet: WalletConnection | null): void {
+    this.currentWallet = wallet;
+  }
+
+  /**
    * Execute contract function
    */
   async executeContract(
@@ -328,14 +335,52 @@ export class WalletManager {
       throw new Error(ERROR_MESSAGES.WALLET_NOT_CONNECTED);
     }
 
-    return await this.walletConnect.executeTransaction(
-      this.currentWallet.accountId,
-      contractId,
-      functionName,
-      parameters,
-      gasLimit,
-      maxTransactionFee
-    );
+    // Check wallet type and use appropriate execution method
+    if (this.currentWallet.walletType === 'metamask') {
+      // Use MetaMask for contract execution
+      const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
+
+      // Convert Hedera contract ID to EVM address format
+      const contractAddress = hederaContractIdToEvmAddress(contractId);
+
+      let result;
+      switch (functionName) {
+        case 'increment':
+          result = await metaMaskWallet.incrementCounter(contractAddress);
+          break;
+        case 'decrement':
+          result = await metaMaskWallet.decrementCounter(contractAddress);
+          break;
+        case 'incrementBy':
+          // For incrementBy, we need to pass the amount parameter
+          // Since we're calling this from incrementCounterBy, we'll get the amount from there
+          result = await metaMaskWallet.executeContract(contractAddress, functionName, [], gasLimit);
+          break;
+        case 'decrementBy':
+          // For decrementBy, we need to pass the amount parameter
+          // Since we're calling this from decrementCounterBy, we'll get the amount from there
+          result = await metaMaskWallet.executeContract(contractAddress, functionName, [], gasLimit);
+          break;
+        default:
+          result = await metaMaskWallet.executeContract(contractAddress, functionName, [], gasLimit);
+      }
+
+      return {
+        success: result.success,
+        transactionId: result.transactionId,
+        error: result.error
+      };
+    } else {
+      // Use WalletConnect for other wallets (HashPack, etc.)
+      return await this.walletConnect.executeTransaction(
+        this.currentWallet.accountId,
+        contractId,
+        functionName,
+        parameters,
+        gasLimit,
+        maxTransactionFee
+      );
+    }
   }
 
   /**
@@ -356,16 +401,48 @@ export class WalletManager {
    * Increment counter by amount
    */
   async incrementCounterBy(contractId: string, amount: number): Promise<ContractCallResult> {
-    const parameters = new ContractFunctionParameters().addUint256(amount);
-    return await this.executeContract(contractId, 'incrementBy', parameters);
+    if (!this.currentWallet) {
+      throw new Error(ERROR_MESSAGES.WALLET_NOT_CONNECTED);
+    }
+
+    // Check wallet type and use appropriate execution method
+    if (this.currentWallet.walletType === 'metamask') {
+      const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
+      const contractAddress = hederaContractIdToEvmAddress(contractId);
+      const result = await metaMaskWallet.incrementCounterBy(contractAddress, amount);
+      return {
+        success: result.success,
+        transactionId: result.transactionId,
+        error: result.error
+      };
+    } else {
+      const parameters = new ContractFunctionParameters().addUint256(amount);
+      return await this.executeContract(contractId, 'incrementBy', parameters);
+    }
   }
 
   /**
    * Decrement counter by amount
    */
   async decrementCounterBy(contractId: string, amount: number): Promise<ContractCallResult> {
-    const parameters = new ContractFunctionParameters().addUint256(amount);
-    return await this.executeContract(contractId, 'decrementBy', parameters);
+    if (!this.currentWallet) {
+      throw new Error(ERROR_MESSAGES.WALLET_NOT_CONNECTED);
+    }
+
+    // Check wallet type and use appropriate execution method
+    if (this.currentWallet.walletType === 'metamask') {
+      const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
+      const contractAddress = hederaContractIdToEvmAddress(contractId);
+      const result = await metaMaskWallet.decrementCounterBy(contractAddress, amount);
+      return {
+        success: result.success,
+        transactionId: result.transactionId,
+        error: result.error
+      };
+    } else {
+      const parameters = new ContractFunctionParameters().addUint256(amount);
+      return await this.executeContract(contractId, 'decrementBy', parameters);
+    }
   }
 
   /**

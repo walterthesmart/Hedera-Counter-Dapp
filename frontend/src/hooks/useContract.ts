@@ -15,6 +15,11 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
 
   const walletManager = getWalletManager();
 
+  // Sync wallet state with wallet manager
+  useEffect(() => {
+    walletManager.setCurrentWallet(wallet);
+  }, [wallet, walletManager]);
+
   // Refresh contract information
   const refresh = useCallback(async () => {
     if (!APP_CONFIG.contractId) {
@@ -179,6 +184,11 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
+    if (!wallet?.isConnected) {
+      setError('Please connect your wallet to perform transactions');
+      return;
+    }
+
     if (contract.count >= contract.maxCount) {
       setError(ERROR_MESSAGES.MAX_COUNT_EXCEEDED);
       return;
@@ -187,14 +197,23 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     await executeContractFunction(
       'increment',
       async () => {
-        // For now, simulate a successful transaction
-        console.log('Simulating increment transaction...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, transactionId: `mock_${Date.now()}` };
+        console.log('Executing real increment transaction...');
+        // Call the actual wallet manager increment function
+        const result = await walletManager.incrementCounter(APP_CONFIG.contractId);
+
+        if (result.success) {
+          return {
+            success: true,
+            transactionId: result.transactionId || `tx_${Date.now()}`,
+            data: result.data
+          };
+        } else {
+          throw new Error(result.error || 'Transaction failed');
+        }
       },
       'Counter incremented successfully'
     );
-  }, [contract, wallet]);
+  }, [contract, wallet, walletManager]);
 
   // Decrement counter
   const decrement = useCallback(async () => {
@@ -202,6 +221,11 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
 
     if (!contract) {
       console.log('No contract available');
+      return;
+    }
+
+    if (!wallet?.isConnected) {
+      setError('Please connect your wallet to perform transactions');
       return;
     }
 
@@ -213,14 +237,23 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     await executeContractFunction(
       'decrement',
       async () => {
-        // For now, simulate a successful transaction
-        console.log('Simulating decrement transaction...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, transactionId: `mock_${Date.now()}` };
+        console.log('Executing real decrement transaction...');
+        // Call the actual wallet manager decrement function
+        const result = await walletManager.decrementCounter(APP_CONFIG.contractId);
+
+        if (result.success) {
+          return {
+            success: true,
+            transactionId: result.transactionId || `tx_${Date.now()}`,
+            data: result.data
+          };
+        } else {
+          throw new Error(result.error || 'Transaction failed');
+        }
       },
       'Counter decremented successfully'
     );
-  }, [contract, wallet]);
+  }, [contract, wallet, walletManager]);
 
   // Increment counter by amount
   const incrementBy = useCallback(async (amount: number) => {
@@ -228,6 +261,11 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
 
     if (!contract) {
       console.log('No contract available');
+      return;
+    }
+
+    if (!wallet?.isConnected) {
+      setError('Please connect your wallet to perform transactions');
       return;
     }
 
@@ -245,14 +283,24 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     await executeContractFunction(
       'incrementBy',
       async () => {
-        // For now, simulate a successful transaction
-        console.log(`Simulating incrementBy ${amount} transaction...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, transactionId: `mock_${Date.now()}`, amount };
+        console.log(`Executing real incrementBy ${amount} transaction...`);
+        // Call the actual wallet manager incrementBy function
+        const result = await walletManager.incrementCounterBy(APP_CONFIG.contractId, amount);
+
+        if (result.success) {
+          return {
+            success: true,
+            transactionId: result.transactionId || `tx_${Date.now()}`,
+            amount,
+            data: result.data
+          };
+        } else {
+          throw new Error(result.error || 'Transaction failed');
+        }
       },
       `Counter incremented by ${amount} successfully`
     );
-  }, [contract, wallet]);
+  }, [contract, wallet, walletManager]);
 
   // Decrement counter by amount
   const decrementBy = useCallback(async (amount: number) => {
@@ -260,6 +308,11 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
 
     if (!contract) {
       console.log('No contract available');
+      return;
+    }
+
+    if (!wallet?.isConnected) {
+      setError('Please connect your wallet to perform transactions');
       return;
     }
 
@@ -277,14 +330,24 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     await executeContractFunction(
       'decrementBy',
       async () => {
-        // For now, simulate a successful transaction
-        console.log(`Simulating decrementBy ${amount} transaction...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return { success: true, transactionId: `mock_${Date.now()}`, amount };
+        console.log(`Executing real decrementBy ${amount} transaction...`);
+        // Call the actual wallet manager decrementBy function
+        const result = await walletManager.decrementCounterBy(APP_CONFIG.contractId, amount);
+
+        if (result.success) {
+          return {
+            success: true,
+            transactionId: result.transactionId || `tx_${Date.now()}`,
+            amount,
+            data: result.data
+          };
+        } else {
+          throw new Error(result.error || 'Transaction failed');
+        }
       },
       `Counter decremented by ${amount} successfully`
     );
-  }, [contract, wallet]);
+  }, [contract, wallet, walletManager]);
 
   // Reset counter (owner only)
   const reset = useCallback(async () => {
