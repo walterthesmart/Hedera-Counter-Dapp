@@ -133,6 +133,42 @@ export class MetaMaskWallet {
   }
 
   /**
+   * Ensure MetaMask is connected to the correct Hedera network
+   */
+  async ensureCorrectNetwork(network: Exclude<HederaNetwork, 'previewnet'> = 'testnet'): Promise<void> {
+    try {
+      const currentChainId = await this.provider.request({ method: 'eth_chainId' });
+      const targetNetwork = HEDERA_NETWORKS[network];
+
+      if (currentChainId !== targetNetwork.chainId) {
+        console.log(`Switching to Hedera ${network} (Chain ID: ${targetNetwork.chainId})`);
+
+        try {
+          // Try to switch to the network
+          await this.provider.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: targetNetwork.chainId }],
+          });
+        } catch (switchError: any) {
+          // If the network doesn't exist, add it
+          if (switchError.code === 4902) {
+            console.log(`Adding Hedera ${network} network to MetaMask`);
+            await this.provider.request({
+              method: 'wallet_addEthereumChain',
+              params: [targetNetwork],
+            });
+          } else {
+            throw switchError;
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to ensure correct network:', error);
+      throw new Error(`Failed to connect to Hedera ${network}. Please manually add the network to MetaMask.`);
+    }
+  }
+
+  /**
    * Connect to MetaMask
    */
   async connect(network: Exclude<HederaNetwork, 'previewnet'> = 'testnet'): Promise<WalletConnection> {
@@ -141,6 +177,9 @@ export class MetaMaskWallet {
     }
 
     try {
+      // First ensure we're on the correct network
+      await this.ensureCorrectNetwork(network);
+
       // Request account access
       const accounts = await this.provider.request({
         method: 'eth_requestAccounts',
@@ -317,6 +356,82 @@ export class MetaMaskWallet {
   }
 
   /**
+   * Get the complete contract ABI for the Counter contract
+   */
+  private getCounterContractABI(): string[] {
+    return [
+      // Constructor
+      "constructor(uint256 initialCount)",
+
+      // Main functions
+      "function increment() external",
+      "function decrement() external",
+      "function incrementBy(uint256 amount) external",
+      "function decrementBy(uint256 amount) external",
+      "function reset() external",
+
+      // View functions
+      "function getCount() external view returns (uint256)",
+      "function getOwner() external view returns (address)",
+      "function isPaused() external view returns (bool)",
+      "function getContractInfo() external view returns (uint256 count, address owner, bool paused, uint256 maxCount, uint256 minCount)",
+
+      // Owner functions
+      "function pause() external",
+      "function unpause() external",
+      "function transferOwnership(address newOwner) external",
+
+      // Constants
+      "function MAX_COUNT() external view returns (uint256)",
+      "function MIN_COUNT() external view returns (uint256)",
+
+      // Events
+      "event CountIncremented(uint256 newCount, address indexed caller)",
+      "event CountDecremented(uint256 newCount, address indexed caller)",
+      "event CountReset(address indexed caller)",
+      "event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)",
+      "event ContractPaused(address indexed caller)",
+      "event ContractUnpaused(address indexed caller)",
+
+      // Custom Errors
+      "error CounterPaused()",
+      "error MaxCountExceeded()",
+      "error MinCountExceeded()",
+      "error OnlyOwner()",
+      "error InvalidAddress()"
+    ];
+  }
+
+  /**
+   * Check if the contract is paused before executing transactions
+   */
+  async isContractPaused(contractAddress: string): Promise<boolean> {
+    try {
+      const contractABI = this.getCounterContractABI();
+      const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
+      return await contract.isPaused();
+    } catch (error) {
+      console.error('Failed to check contract pause status:', error);
+      return false; // Assume not paused if we can't check
+    }
+  }
+
+  /**
+   * Get current contract count
+   */
+  async getContractCount(contractAddress: string): Promise<number | null> {
+    try {
+      const contractABI = this.getCounterContractABI();
+      const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
+      const count = await contract.getCount();
+      return count.toNumber();
+    } catch (error) {
+      console.error('Failed to get contract count:', error);
+      return null;
+    }
+  }
+
+  /**
    * Execute a smart contract function
    */
   async executeContract(
@@ -335,44 +450,77 @@ export class MetaMaskWallet {
     try {
       console.log(`Executing contract function: ${functionName} on ${contractAddress}`);
 
-      // For Hedera smart contracts, we need to use the contract's ABI
-      // Since we're working with a simple counter contract, we'll define the basic ABI
-      const contractABI = [
-        "function increment() external",
-        "function decrement() external",
-        "function incrementBy(uint256 amount) external",
-        "function decrementBy(uint256 amount) external",
-        "function getCount() external view returns (uint256)",
-        "function reset() external"
-      ];
+      // Check if contract is paused before executing state-changing functions
+      const stateMutatingFunctions = ['increment', 'decrement', 'incrementBy', 'decrementBy'];
+      if (stateMutatingFunctions.includes(functionName)) {
+        const isPaused = await this.isContractPaused(contractAddress);
+        if (isPaused) {
+          return {
+            success: false,
+            error: 'Contract is currently paused. Please contact the contract owner.'
+          };
+        }
+      }
+
+      // Get the complete contract ABI
+      const contractABI = this.getCounterContractABI();
 
       // Create contract instance
       const contract = new ethers.Contract(contractAddress, contractABI, this.signer);
 
-      // Execute the function
+      // Execute the function with increased gas limit and proper error handling
       let tx;
+      const txOptions = {
+        gasLimit: gasLimit,
+        // Add some buffer for gas estimation
+        gasPrice: undefined // Let MetaMask estimate
+      };
+
       if (parameters.length > 0) {
-        tx = await contract[functionName](...parameters, { gasLimit });
+        tx = await contract[functionName](...parameters, txOptions);
       } else {
-        tx = await contract[functionName]({ gasLimit });
+        tx = await contract[functionName](txOptions);
       }
 
       console.log('Transaction sent:', tx.hash);
+      console.log('Transaction details:', {
+        to: tx.to,
+        from: tx.from,
+        gasLimit: tx.gasLimit?.toString(),
+        gasPrice: tx.gasPrice?.toString()
+      });
 
       // Wait for transaction confirmation
       const receipt = await tx.wait();
       console.log('Transaction confirmed:', receipt.transactionHash);
+      console.log('Gas used:', receipt.gasUsed?.toString());
 
       return {
         success: true,
         transactionId: receipt.transactionHash
       };
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Contract execution failed:', error);
+
+      // Parse specific error messages
+      let errorMessage = 'Contract execution failed';
+
+      if (error.code === 'CALL_EXCEPTION') {
+        if (error.reason) {
+          errorMessage = `Contract call failed: ${error.reason}`;
+        } else if (error.data) {
+          errorMessage = 'Contract call reverted. This might be due to contract constraints (max/min count limits, paused state, or insufficient permissions).';
+        }
+      } else if (error.code === 'UNPREDICTABLE_GAS_LIMIT') {
+        errorMessage = 'Transaction would fail. Please check contract state and your permissions.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Contract execution failed'
+        error: errorMessage
       };
     }
   }
@@ -381,28 +529,126 @@ export class MetaMaskWallet {
    * Increment counter
    */
   async incrementCounter(contractAddress: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-    return await this.executeContract(contractAddress, 'increment');
+    // Pre-check: Get current count to validate increment is possible
+    try {
+      const currentCount = await this.getContractCount(contractAddress);
+      if (currentCount !== null && currentCount >= 1000000) { // MAX_COUNT
+        return {
+          success: false,
+          error: 'Cannot increment: Maximum count limit (1,000,000) would be exceeded.'
+        };
+      }
+    } catch (error) {
+      console.warn('Could not pre-validate increment operation:', error);
+    }
+
+    return await this.executeContract(contractAddress, 'increment', [], 350000);
   }
 
   /**
    * Decrement counter
    */
   async decrementCounter(contractAddress: string): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-    return await this.executeContract(contractAddress, 'decrement');
+    // Pre-check: Get current count to validate decrement is possible
+    try {
+      const currentCount = await this.getContractCount(contractAddress);
+      if (currentCount !== null && currentCount <= 0) { // MIN_COUNT
+        return {
+          success: false,
+          error: 'Cannot decrement: Minimum count limit (0) would be exceeded.'
+        };
+      }
+    } catch (error) {
+      console.warn('Could not pre-validate decrement operation:', error);
+    }
+
+    return await this.executeContract(contractAddress, 'decrement', [], 350000);
   }
 
   /**
    * Increment counter by amount
    */
   async incrementCounterBy(contractAddress: string, amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-    return await this.executeContract(contractAddress, 'incrementBy', [amount]);
+    // Validate amount
+    if (amount <= 0) {
+      return {
+        success: false,
+        error: 'Amount must be greater than 0.'
+      };
+    }
+
+    // Pre-check: Get current count to validate increment is possible
+    try {
+      const currentCount = await this.getContractCount(contractAddress);
+      if (currentCount !== null && currentCount + amount > 1000000) { // MAX_COUNT
+        return {
+          success: false,
+          error: `Cannot increment by ${amount}: Maximum count limit (1,000,000) would be exceeded.`
+        };
+      }
+    } catch (error) {
+      console.warn('Could not pre-validate incrementBy operation:', error);
+    }
+
+    return await this.executeContract(contractAddress, 'incrementBy', [amount], 350000);
   }
 
   /**
    * Decrement counter by amount
    */
   async decrementCounterBy(contractAddress: string, amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
-    return await this.executeContract(contractAddress, 'decrementBy', [amount]);
+    // Validate amount
+    if (amount <= 0) {
+      return {
+        success: false,
+        error: 'Amount must be greater than 0.'
+      };
+    }
+
+    // Pre-check: Get current count to validate decrement is possible
+    try {
+      const currentCount = await this.getContractCount(contractAddress);
+      if (currentCount !== null && (currentCount < amount || currentCount - amount < 0)) { // MIN_COUNT
+        return {
+          success: false,
+          error: `Cannot decrement by ${amount}: Minimum count limit (0) would be exceeded.`
+        };
+      }
+    } catch (error) {
+      console.warn('Could not pre-validate decrementBy operation:', error);
+    }
+
+    return await this.executeContract(contractAddress, 'decrementBy', [amount], 350000);
+  }
+
+  /**
+   * Debug function to get comprehensive contract information
+   */
+  async debugContractState(contractAddress: string): Promise<any> {
+    try {
+      const contractABI = this.getCounterContractABI();
+      const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
+
+      const [count, owner, paused, maxCount, minCount] = await contract.getContractInfo();
+
+      const debugInfo = {
+        contractAddress,
+        currentCount: count.toNumber(),
+        owner: owner,
+        isPaused: paused,
+        maxCount: maxCount.toNumber(),
+        minCount: minCount.toNumber(),
+        connectedAccount: this.connection?.accountId,
+        network: this.connection?.network,
+        chainId: await this.provider.request({ method: 'eth_chainId' })
+      };
+
+      console.log('🔍 Contract Debug Info:', debugInfo);
+      return debugInfo;
+    } catch (error) {
+      console.error('Failed to get contract debug info:', error);
+      return { error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   }
 }
 

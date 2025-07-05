@@ -170,6 +170,18 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       const errorMessage = formatWalletError(error);
       setError(errorMessage);
       console.error(`${functionName} failed:`, error);
+
+      // If using MetaMask, get debug information
+      if (wallet?.walletType === 'metamask') {
+        try {
+          const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
+          const contractAddress = hederaContractIdToEvmAddress(APP_CONFIG.contractId);
+          const debugInfo = await metaMaskWallet.debugContractState(contractAddress);
+          console.log('🔍 Debug info after error:', debugInfo);
+        } catch (debugError) {
+          console.warn('Could not get debug info:', debugError);
+        }
+      }
     } finally {
       setIsLoading(false);
     }
