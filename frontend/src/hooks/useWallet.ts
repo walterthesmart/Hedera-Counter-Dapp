@@ -14,7 +14,8 @@ import {
   connectMetaMask,
   disconnectMetaMask,
   getMetaMaskConnection,
-  isMetaMaskInstalled
+  isMetaMaskInstalled,
+  refreshMetaMaskBalance
 } from '@/utils/metamask';
 import { SUCCESS_MESSAGES } from '@/utils/config';
 
@@ -25,19 +26,41 @@ export const useWallet = (): UseWalletReturn => {
 
   // Load saved wallet connection on mount
   useEffect(() => {
+    console.log('🔍 useWallet: Loading saved connections...');
+
     // Check for saved HashPack connection
     const savedHashPack = getHashPackConnection();
+    console.log('🔍 useWallet: HashPack connection:', savedHashPack);
     if (savedHashPack && savedHashPack.isConnected) {
+      console.log('🔍 useWallet: Setting HashPack wallet with balance:', savedHashPack.balance);
       setWallet(savedHashPack);
       return;
     }
 
     // Check for saved MetaMask connection
     const savedMetaMask = getMetaMaskConnection();
+    console.log('🔍 useWallet: MetaMask connection:', savedMetaMask);
     if (savedMetaMask && savedMetaMask.isConnected) {
+      console.log('🔍 useWallet: Setting MetaMask wallet with balance:', savedMetaMask.balance);
       setWallet(savedMetaMask);
+
+      // Refresh balance in the background
+      if (savedMetaMask.walletType === 'metamask') {
+        refreshMetaMaskBalance().then(() => {
+          console.log('🔍 useWallet: Balance refreshed, getting updated connection');
+          const updatedConnection = getMetaMaskConnection();
+          if (updatedConnection) {
+            console.log('🔍 useWallet: Updated connection with balance:', updatedConnection.balance);
+            setWallet(updatedConnection);
+          }
+        }).catch(error => {
+          console.error('🔍 useWallet: Failed to refresh balance:', error);
+        });
+      }
       return;
     }
+
+    console.log('🔍 useWallet: No saved connections found');
   }, []);
 
   // Check if HashPack is available
@@ -75,6 +98,8 @@ export const useWallet = (): UseWalletReturn => {
           break;
       }
 
+      console.log('🔍 useWallet: Connection established:', connection);
+      console.log('🔍 useWallet: Connection balance:', connection.balance);
       setWallet(connection);
       console.log(SUCCESS_MESSAGES.WALLET_CONNECTED);
     } catch (error) {

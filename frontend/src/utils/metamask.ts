@@ -139,6 +139,35 @@ export class MetaMaskWallet {
   }
 
   /**
+   * Refresh balance for current connection
+   */
+  async refreshBalance(): Promise<void> {
+    if (!this.connection || !this.provider || !this.connection.address) {
+      console.log('🔍 refreshBalance: No connection or provider available');
+      return;
+    }
+
+    try {
+      console.log('🔍 refreshBalance: Refreshing balance for', this.connection.address);
+      const balance = await this.provider.getBalance(this.connection.address);
+      const balanceInHbar = ethers.formatEther(balance);
+      const formattedBalance = `${parseFloat(balanceInHbar).toFixed(4)} HBAR`;
+
+      console.log('🔍 refreshBalance: New balance:', formattedBalance);
+
+      this.connection = {
+        ...this.connection,
+        balance: formattedBalance,
+      };
+
+      this.saveConnection();
+      console.log('🔍 refreshBalance: Balance updated and saved');
+    } catch (error) {
+      console.error('Failed to refresh balance:', error);
+    }
+  }
+
+  /**
    * Get current chain ID
    */
   async getChainId(): Promise<string | null> {
@@ -216,6 +245,11 @@ export class MetaMaskWallet {
       // Get account balance
       const balance = await this.provider!.getBalance(accounts[0]);
       const balanceInHbar = ethers.formatEther(balance);
+      console.log('🔍 MetaMask Balance Debug:', {
+        rawBalance: balance.toString(),
+        balanceInHbar,
+        formattedBalance: `${parseFloat(balanceInHbar).toFixed(4)} HBAR`
+      });
 
       // Convert Ethereum address to Hedera account ID format
       const accountId = this.addressToAccountId(accounts[0]);
@@ -228,6 +262,8 @@ export class MetaMaskWallet {
         walletType: 'metamask',
         address: accounts[0],
       };
+
+      console.log('🔍 MetaMask Connection Created:', this.connection);
 
       // Save connection to localStorage
       this.saveConnection();
@@ -289,6 +325,12 @@ export class MetaMaskWallet {
       const ethersProvider = new ethers.BrowserProvider(this.provider as any);
       const balance = await ethersProvider.getBalance(newAccount);
       const balanceInHbar = ethers.formatEther(balance);
+      console.log('🔍 MetaMask updateConnection Balance:', {
+        newAccount,
+        rawBalance: balance.toString(),
+        balanceInHbar,
+        formattedBalance: `${parseFloat(balanceInHbar).toFixed(4)} HBAR`
+      });
 
       this.connection = {
         ...this.connection,
@@ -297,6 +339,7 @@ export class MetaMaskWallet {
         balance: `${parseFloat(balanceInHbar).toFixed(4)} HBAR`,
       };
 
+      console.log('🔍 MetaMask updateConnection result:', this.connection);
       this.saveConnection();
     } catch (error) {
       console.error('Failed to update connection:', error);
@@ -353,11 +396,14 @@ export class MetaMaskWallet {
   loadSavedConnection(): WalletConnection | null {
     try {
       const saved = localStorage.getItem('metamask_connection');
+      console.log('🔍 Loading saved MetaMask connection:', saved);
       if (saved) {
         const connection = JSON.parse(saved);
+        console.log('🔍 Parsed saved connection:', connection);
         // Verify the connection is still valid
         if (this.isAvailable() && connection.isConnected) {
           this.connection = connection;
+          console.log('🔍 Restored MetaMask connection with balance:', connection.balance);
           return connection;
         }
       }
@@ -749,9 +795,24 @@ export const disconnectMetaMask = async (): Promise<void> => {
 };
 
 export const getMetaMaskConnection = (): WalletConnection | null => {
-  return metaMaskWallet.getConnection() || metaMaskWallet.loadSavedConnection();
+  const currentConnection = metaMaskWallet.getConnection();
+  console.log('🔍 getMetaMaskConnection - current:', currentConnection);
+
+  if (currentConnection) {
+    console.log('🔍 getMetaMaskConnection - returning current connection with balance:', currentConnection.balance);
+    return currentConnection;
+  }
+
+  const savedConnection = metaMaskWallet.loadSavedConnection();
+  console.log('🔍 getMetaMaskConnection - saved:', savedConnection);
+  console.log('🔍 getMetaMaskConnection - final result balance:', savedConnection?.balance);
+  return savedConnection;
 };
 
 export const isMetaMaskConnected = (): boolean => {
   return metaMaskWallet.isConnected();
+};
+
+export const refreshMetaMaskBalance = async (): Promise<void> => {
+  return await metaMaskWallet.refreshBalance();
 };

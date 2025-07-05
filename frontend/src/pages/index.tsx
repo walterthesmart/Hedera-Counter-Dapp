@@ -15,6 +15,16 @@ import { APP_CONFIG, getContractExplorerUrl } from '@/utils/config';
 
 export default function Home() {
   const { wallet, connect, disconnect, isConnecting, error: walletError } = useWallet();
+
+  // Debug wallet state
+  useEffect(() => {
+    console.log('🔍 UI: Wallet state changed:', {
+      wallet,
+      isConnected: wallet?.isConnected,
+      balance: wallet?.balance,
+      accountId: wallet?.accountId
+    });
+  }, [wallet]);
   const { 
     contract, 
     increment, 
@@ -148,62 +158,74 @@ export default function Home() {
         {/* Header */}
         <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-40">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 space-y-4 sm:space-y-0">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-hedera-500 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-lg">H</span>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold gradient-text">
+                  <h1 className="text-lg sm:text-xl font-bold gradient-text">
                     {APP_CONFIG.appName}
                   </h1>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-xs sm:text-sm text-gray-600">
                     Hedera Blockchain Counter
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-4">
-                <a
-                  href="https://github.com/walterthesmart/Hedera-Counter-Dapp"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                  title="View on GitHub"
-                >
-                  <Github className="w-5 h-5" />
-                </a>
-
-                <a
-                  href="https://github.com/walterthesmart/Hedera-Counter-Dapp/blob/main/README.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-600 hover:text-gray-900 transition-colors"
-                  title="Project Documentation"
-                >
-                  <BookOpen className="w-5 h-5" />
-                </a>
-
-                {APP_CONFIG.contractId && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
+                {/* Navigation Links - Hidden on mobile, shown on larger screens */}
+                <div className="hidden sm:flex items-center space-x-4">
                   <a
-                    href={getContractExplorerUrl(APP_CONFIG.contractId, APP_CONFIG.network)}
+                    href="https://github.com/walterthesmart/Hedera-Counter-Dapp"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-gray-600 hover:text-gray-900 transition-colors"
-                    title="View Contract on HashScan"
+                    title="View on GitHub"
                   >
-                    <ExternalLink className="w-5 h-5" />
+                    <Github className="w-5 h-5" />
                   </a>
-                )}
+
+                  <a
+                    href="https://github.com/walterthesmart/Hedera-Counter-Dapp/blob/main/README.md"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-gray-900 transition-colors"
+                    title="Project Documentation"
+                  >
+                    <BookOpen className="w-5 h-5" />
+                  </a>
+
+                  {APP_CONFIG.contractId && (
+                    <a
+                      href={getContractExplorerUrl(APP_CONFIG.contractId, APP_CONFIG.network)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-gray-600 hover:text-gray-900 transition-colors"
+                      title="View Contract on HashScan"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </a>
+                  )}
+                </div>
 
                 {/* MetaMask Connect Button */}
                 {wallet?.isConnected ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-2 px-3 py-1 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm font-medium text-green-700">
-                        {wallet.accountId.slice(0, 8)}...
-                      </span>
+                  <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                    <div className="flex flex-col sm:flex-row items-end sm:items-center space-y-1 sm:space-y-0 sm:space-x-2">
+                      <div className="flex items-center space-x-2 px-3 py-1 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm font-medium text-green-700">
+                          {wallet.accountId.slice(0, 8)}...
+                        </span>
+                      </div>
+                      {wallet.balance && (
+                        <div className="px-3 py-1 bg-blue-50 border border-blue-200 rounded-lg">
+                          <span className="text-sm font-medium text-blue-700">
+                            {wallet.balance}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={disconnect}
@@ -217,7 +239,7 @@ export default function Home() {
                   <button
                     onClick={() => connect('metamask')}
                     disabled={isConnecting}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
+                    className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 text-sm font-medium"
                   >
                     {isConnecting ? (
                       <>
@@ -237,11 +259,53 @@ export default function Home() {
           </div>
         </header>
 
+        {/* Mobile Navigation Links */}
+        <div className="sm:hidden bg-gray-50 border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 py-3">
+            <div className="flex items-center justify-center space-x-6">
+              <a
+                href="https://github.com/walterthesmart/Hedera-Counter-Dapp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                title="View on GitHub"
+              >
+                <Github className="w-4 h-4" />
+                <span className="text-sm">GitHub</span>
+              </a>
+
+              <a
+                href="https://github.com/walterthesmart/Hedera-Counter-Dapp/blob/main/README.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                title="Project Documentation"
+              >
+                <BookOpen className="w-4 h-4" />
+                <span className="text-sm">Docs</span>
+              </a>
+
+              {APP_CONFIG.contractId && (
+                <a
+                  href={getContractExplorerUrl(APP_CONFIG.contractId, APP_CONFIG.network)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+                  title="View Contract on HashScan"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span className="text-sm">Contract</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Main Content */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
             {/* Left Column - Counter */}
-            <div className="lg:col-span-2 space-y-8">
+            <div className="lg:col-span-2 space-y-4 sm:space-y-6 lg:space-y-8">
               {/* Counter Display */}
               {contract && (
                 <CounterDisplay
@@ -268,7 +332,7 @@ export default function Home() {
             </div>
 
             {/* Right Column - Transaction History & Info */}
-            <div className="space-y-8">
+            <div className="space-y-4 sm:space-y-6 lg:space-y-8">
               {/* Transaction History */}
               <TransactionHistory
                 transactions={transactions}
