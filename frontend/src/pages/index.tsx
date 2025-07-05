@@ -207,10 +207,10 @@ export default function Home() {
                     </div>
                     <button
                       onClick={disconnect}
-                      className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                      className="px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded-lg transition-colors text-sm font-medium"
                       title="Disconnect Wallet"
                     >
-                      <span className="text-sm">⏻</span>
+                      Disconnect
                     </button>
                   </div>
                 ) : (
