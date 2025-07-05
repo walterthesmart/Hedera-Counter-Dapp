@@ -283,10 +283,10 @@ export class MetaMaskWallet {
    * Update connection with new account
    */
   private async updateConnection(newAccount: string): Promise<void> {
-    if (!this.connection) return;
+    if (!this.connection || !this.provider) return;
 
     try {
-      const ethersProvider = new ethers.BrowserProvider(this.provider);
+      const ethersProvider = new ethers.BrowserProvider(this.provider as any);
       const balance = await ethersProvider.getBalance(newAccount);
       const balanceInHbar = ethers.formatEther(balance);
 
