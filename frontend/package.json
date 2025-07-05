@@ -16,6 +16,7 @@
     "@types/node": "20.8.0",
     "@types/react": "18.2.25",
     "@types/react-dom": "18.2.11",
+    "@vercel/speed-insights": "^1.2.0",
     "@walletconnect/modal": "^2.6.2",
     "clsx": "^2.0.0",
     "ethers": "^6.8.0",
