@@ -5,6 +5,7 @@
 import type { AppProps } from 'next/app';
 import { Toaster } from 'react-hot-toast';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { Analytics } from '@vercel/analytics/next';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import '@/styles/globals.css';
 
@@ -40,6 +41,7 @@ export default function App({ Component, pageProps }: AppProps) {
         }}
       />
       <SpeedInsights />
+      <Analytics />
     </ErrorBoundary>
   );
 }
