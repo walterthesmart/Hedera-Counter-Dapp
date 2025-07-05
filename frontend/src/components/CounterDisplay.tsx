@@ -59,7 +59,7 @@ export const CounterDisplay: React.FC<CounterDisplayProps> = ({
             {formatNumber(count)}
           </div>
           
-          {count !== formatNumber(count) && (
+          {count.toString() !== formatNumber(count) && (
             <div className="text-lg text-gray-600 font-mono">
               {count.toLocaleString()}
             </div>

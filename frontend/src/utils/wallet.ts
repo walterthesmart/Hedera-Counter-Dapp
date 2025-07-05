@@ -53,6 +53,36 @@ class MockHederaWalletConnect {
   isWalletConnected() {
     return this.isConnected;
   }
+
+  async executeTransaction(
+    accountId: string,
+    contractId: string,
+    functionName: string,
+    parameters?: any,
+    gasLimit?: number,
+    maxTransactionFee?: number
+  ) {
+    console.log('Mock transaction execution:', {
+      accountId,
+      contractId,
+      functionName,
+      parameters,
+      gasLimit,
+      maxTransactionFee
+    });
+
+    // Simulate transaction execution
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    return {
+      transactionId: `0.0.${Date.now()}@${Date.now()}.${Math.floor(Math.random() * 1000000)}`,
+      status: 'SUCCESS',
+      contractResult: {
+        gasUsed: gasLimit || 100000,
+        result: 'Mock transaction result'
+      }
+    };
+  }
 }
 
 // Use mock implementation temporarily
@@ -78,7 +108,7 @@ import {
  * Hedera WalletConnect integration
  */
 export class HederaWalletConnectManager {
-  private walletConnect: HederaWalletConnect | null = null;
+  private walletConnect: MockHederaWalletConnect | null = null;
   private session: WalletConnectSession | null = null;
   private isInitialized = false;
 
@@ -122,12 +152,16 @@ export class HederaWalletConnectManager {
       const result = await this.walletConnect!.connect();
 
       this.session = {
-        accountId: result.accountId,
-        network: result.network as HederaNetwork,
-        isConnected: true,
-        connectedAt: new Date(),
-        walletType: 'walletconnect',
-        topic: 'mock-topic'
+        topic: 'mock-topic',
+        peer: {
+          metadata: {
+            name: 'Mock Wallet',
+            description: 'Mock wallet for development',
+            url: 'https://mock-wallet.com',
+            icons: []
+          }
+        },
+        namespaces: {}
       };
 
       const connection: WalletConnection = {
@@ -188,8 +222,12 @@ export class HederaWalletConnectManager {
 
       // Execute transaction through WalletConnect
       const result = await this.walletConnect!.executeTransaction(
-        transaction,
-        accountId
+        accountId,
+        contractId,
+        functionName,
+        parameters,
+        gasLimit,
+        maxTransactionFee
       );
 
       if (result && result.transactionId) {
@@ -386,7 +424,7 @@ export const getWalletManager = (): WalletManager => {
 export const isWalletAvailable = (): boolean => {
   const manager = getWalletManager();
   const wallets = manager.getAvailableWallets();
-  return wallets.some(wallet => wallet.isInstalled);
+  return wallets.some(wallet => wallet.isAvailable);
 };
 
 /**

@@ -129,7 +129,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>{APP_CONFIG.appName} - Hedera Blockchain Counter</title>
+        <title>{`${APP_CONFIG.appName} - Hedera Blockchain Counter`}</title>
         <meta name="description" content="A complete educational Hedera blockchain project demonstrating smart contract interaction with a simple counter dApp." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />

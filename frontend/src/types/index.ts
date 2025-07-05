@@ -2,8 +2,18 @@
  * Type definitions for the Hedera Counter DApp
  */
 
+// Global type declarations
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
 // Hedera Network Types
 export type HederaNetwork = 'testnet' | 'mainnet' | 'previewnet';
+
+// Wallet Types
+export type WalletType = 'hashpack' | 'walletconnect' | 'metamask' | 'mock';
 
 // Wallet Connection Types
 export interface WalletConnection {
@@ -11,6 +21,8 @@ export interface WalletConnection {
   isConnected: boolean;
   network: HederaNetwork;
   balance?: string;
+  walletType?: WalletType;
+  address?: string; // Ethereum address for MetaMask
 }
 
 // Contract Types
@@ -54,10 +66,21 @@ export interface CounterDisplayProps {
 }
 
 export interface WalletButtonProps {
-  onConnect: () => Promise<void>;
+  onConnect: (walletType?: WalletType) => Promise<void>;
   onDisconnect: () => void;
   wallet: WalletConnection | null;
   isConnecting?: boolean;
+}
+
+export interface UseWalletReturn {
+  wallet: WalletConnection | null;
+  isConnecting: boolean;
+  error: string | null;
+  connect: (walletType?: WalletType) => Promise<void>;
+  disconnect: () => Promise<void>;
+  isConnected: boolean;
+  isHashPackAvailable: boolean;
+  isMetaMaskAvailable: boolean;
 }
 
 export interface TransactionButtonProps {
@@ -157,16 +180,7 @@ export interface DecrementByFormData {
   amount: number;
 }
 
-// Hook Return Types
-export interface UseWalletReturn {
-  wallet: WalletConnection | null;
-  connect: () => Promise<void>;
-  disconnect: () => Promise<void>;
-  isConnecting: boolean;
-  error: string | null;
-  isConnected: boolean;
-  isHashPackAvailable: boolean;
-}
+// Hook Return Types (removed duplicate - using the one defined earlier)
 
 export interface UseContractReturn {
   contract: ContractInfo | null;
@@ -185,6 +199,10 @@ export interface UseTransactionsReturn {
   addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   clearTransactions: () => void;
+  getTransactionsByStatus: (status: TransactionStatus) => Transaction[];
+  getPendingTransactions: () => Transaction[];
+  getSuccessfulTransactions: () => Transaction[];
+  getFailedTransactions: () => Transaction[];
 }
 
 // Utility Types

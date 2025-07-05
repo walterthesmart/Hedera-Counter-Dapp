@@ -87,6 +87,7 @@ export const ERROR_MESSAGES = {
   MIN_COUNT_EXCEEDED: 'Cannot decrement below minimum count',
   INVALID_AMOUNT: 'Please enter a valid amount',
   WALLET_REJECTED: 'Transaction was rejected by wallet',
+  CONNECTION_FAILED: 'Failed to connect to wallet',
   UNKNOWN_ERROR: 'An unknown error occurred',
 } as const;
 

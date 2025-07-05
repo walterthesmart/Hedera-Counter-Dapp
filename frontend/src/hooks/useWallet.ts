@@ -3,14 +3,19 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { WalletConnection, UseWalletReturn } from '@/types';
+import { WalletConnection, UseWalletReturn, WalletType } from '@/types';
 import {
   hashPackWallet,
   connectHashPack,
   disconnectHashPack,
-  getHashPackConnection,
-  isHashPackConnected
+  getHashPackConnection
 } from '@/utils/hashpack';
+import {
+  connectMetaMask,
+  disconnectMetaMask,
+  getMetaMaskConnection,
+  isMetaMaskInstalled
+} from '@/utils/metamask';
 import { SUCCESS_MESSAGES } from '@/utils/config';
 
 export const useWallet = (): UseWalletReturn => {
@@ -20,9 +25,18 @@ export const useWallet = (): UseWalletReturn => {
 
   // Load saved wallet connection on mount
   useEffect(() => {
-    const savedWallet = getHashPackConnection();
-    if (savedWallet && savedWallet.isConnected) {
-      setWallet(savedWallet);
+    // Check for saved HashPack connection
+    const savedHashPack = getHashPackConnection();
+    if (savedHashPack && savedHashPack.isConnected) {
+      setWallet(savedHashPack);
+      return;
+    }
+
+    // Check for saved MetaMask connection
+    const savedMetaMask = getMetaMaskConnection();
+    if (savedMetaMask && savedMetaMask.isConnected) {
+      setWallet(savedMetaMask);
+      return;
     }
   }, []);
 
@@ -31,46 +45,65 @@ export const useWallet = (): UseWalletReturn => {
     return hashPackWallet.isAvailable();
   }, []);
 
-  // Connect to HashPack wallet
-  const connect = useCallback(async () => {
-    if (!isHashPackAvailable()) {
-      setError('HashPack wallet is not installed. Please install the HashPack browser extension.');
-      return;
-    }
+  // Check if MetaMask is available
+  const isMetaMaskAvailable = useCallback(() => {
+    return isMetaMaskInstalled();
+  }, []);
 
+  // Connect to wallet (HashPack, MetaMask, or WalletConnect)
+  const connect = useCallback(async (walletType: WalletType = 'hashpack') => {
     setIsConnecting(true);
     setError(null);
 
     try {
-      const connection = await connectHashPack();
-      setWallet(connection);
+      let connection: WalletConnection;
 
-      // Show success message
+      switch (walletType) {
+        case 'metamask':
+          if (!isMetaMaskAvailable()) {
+            throw new Error('MetaMask is not installed. Please install the MetaMask browser extension.');
+          }
+          connection = await connectMetaMask();
+          break;
+
+        case 'hashpack':
+        default:
+          if (!isHashPackAvailable()) {
+            throw new Error('HashPack wallet is not installed. Please install the HashPack browser extension.');
+          }
+          connection = await connectHashPack();
+          break;
+      }
+
+      setWallet(connection);
       console.log(SUCCESS_MESSAGES.WALLET_CONNECTED);
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to connect to HashPack wallet';
+      const errorMessage = error instanceof Error ? error.message : `Failed to connect to ${walletType} wallet`;
       setError(errorMessage);
-      console.error('HashPack connection failed:', error);
+      console.error(`${walletType} connection failed:`, error);
     } finally {
       setIsConnecting(false);
     }
-  }, [isHashPackAvailable]);
+  }, [isHashPackAvailable, isMetaMaskAvailable]);
 
-  // Disconnect from HashPack wallet
+  // Disconnect from current wallet
   const disconnect = useCallback(async () => {
     try {
-      await disconnectHashPack();
+      if (wallet?.walletType === 'metamask') {
+        await disconnectMetaMask();
+      } else {
+        await disconnectHashPack();
+      }
       setWallet(null);
       setError(null);
 
-      // Show success message
-      console.log('HashPack wallet disconnected successfully');
+      console.log('Wallet disconnected successfully');
     } catch (error) {
-      console.error('HashPack disconnect failed:', error);
+      console.error('Wallet disconnect failed:', error);
       // Even if disconnect fails, clear the local state
       setWallet(null);
     }
-  }, []);
+  }, [wallet?.walletType]);
 
   return {
     wallet,
@@ -80,5 +113,6 @@ export const useWallet = (): UseWalletReturn => {
     disconnect,
     isConnected: !!wallet?.isConnected,
     isHashPackAvailable: isHashPackAvailable(),
+    isMetaMaskAvailable: isMetaMaskAvailable(),
   };
 };

@@ -11,12 +11,13 @@ import {
   ContractCallQuery,
   ContractFunctionParameters,
   AccountId,
+  AccountBalanceQuery,
   Hbar,
-  TransactionId
+  TransactionId,
+  LedgerId
 } from '@hashgraph/sdk';
 
 import {
-  HederaWalletConnectProvider,
   DAppConnector,
   HederaSessionEvent,
   HederaJsonRpcMethod,
@@ -43,7 +44,7 @@ export class HashPackWalletManager {
   private connection: WalletConnection | null = null;
   private client: Client | null = null;
   private dAppConnector: DAppConnector | null = null;
-  private walletConnectProvider: HederaWalletConnectProvider | null = null;
+  private walletConnectProvider: any | null = null;
 
   constructor() {
     this.setupClient();
@@ -70,7 +71,7 @@ export class HashPackWalletManager {
           url: window.location.origin,
           icons: [window.location.origin + "/favicon.ico"],
         },
-        ENV.HEDERA_NETWORK as 'testnet' | 'mainnet',
+        ENV.HEDERA_NETWORK === 'mainnet' ? LedgerId.MAINNET : LedgerId.TESTNET,
         ENV.WALLETCONNECT_PROJECT_ID || 'demo-project-id',
         Object.values(HederaJsonRpcMethod),
         [HederaSessionEvent.ChainChanged, HederaSessionEvent.AccountsChanged],
@@ -133,7 +134,9 @@ export class HashPackWalletManager {
       let balance = '0';
       try {
         if (this.client && accountId) {
-          const accountBalance = await this.client.getAccountBalance(AccountId.fromString(accountId));
+          const query = new AccountBalanceQuery()
+            .setAccountId(AccountId.fromString(accountId));
+          const accountBalance = await query.execute(this.client);
           balance = accountBalance.hbars.toString();
         }
       } catch (error) {
@@ -168,7 +171,11 @@ export class HashPackWalletManager {
   async disconnectWallet(): Promise<void> {
     try {
       if (this.dAppConnector) {
-        await this.dAppConnector.disconnect();
+        // Get the current session topic if available
+        const sessions = this.dAppConnector.walletConnectClient?.session.getAll() || [];
+        if (sessions.length > 0) {
+          await this.dAppConnector.disconnect(sessions[0].topic);
+        }
       }
 
       this.connection = null;
