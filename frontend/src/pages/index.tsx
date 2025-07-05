@@ -34,93 +34,103 @@ export default function Home() {
 
   // Add transaction tracking to contract operations
   const handleIncrement = async () => {
-    const txId = `tx_${Date.now()}`;
-    addTransaction({
+    const txId = addTransaction({
       type: 'increment',
       status: 'pending',
     });
-    
+
     try {
-      await increment();
-      updateTransaction(txId, { status: 'success' });
+      const result = await increment();
+      updateTransaction(txId, {
+        status: 'success',
+        hash: result?.transactionId || undefined
+      });
     } catch (error) {
-      updateTransaction(txId, { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Transaction failed' 
+      updateTransaction(txId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Transaction failed'
       });
     }
   };
 
   const handleDecrement = async () => {
-    const txId = `tx_${Date.now()}`;
-    addTransaction({
+    const txId = addTransaction({
       type: 'decrement',
       status: 'pending',
     });
-    
+
     try {
-      await decrement();
-      updateTransaction(txId, { status: 'success' });
+      const result = await decrement();
+      updateTransaction(txId, {
+        status: 'success',
+        hash: result?.transactionId || undefined
+      });
     } catch (error) {
-      updateTransaction(txId, { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Transaction failed' 
+      updateTransaction(txId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Transaction failed'
       });
     }
   };
 
   const handleIncrementBy = async (amount: number) => {
-    const txId = `tx_${Date.now()}`;
-    addTransaction({
+    const txId = addTransaction({
       type: 'incrementBy',
       status: 'pending',
       amount,
     });
-    
+
     try {
-      await incrementBy(amount);
-      updateTransaction(txId, { status: 'success' });
+      const result = await incrementBy(amount);
+      updateTransaction(txId, {
+        status: 'success',
+        hash: result?.transactionId || undefined
+      });
     } catch (error) {
-      updateTransaction(txId, { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Transaction failed' 
+      updateTransaction(txId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Transaction failed'
       });
     }
   };
 
   const handleDecrementBy = async (amount: number) => {
-    const txId = `tx_${Date.now()}`;
-    addTransaction({
+    const txId = addTransaction({
       type: 'decrementBy',
       status: 'pending',
       amount,
     });
-    
+
     try {
-      await decrementBy(amount);
-      updateTransaction(txId, { status: 'success' });
+      const result = await decrementBy(amount);
+      updateTransaction(txId, {
+        status: 'success',
+        hash: result?.transactionId || undefined
+      });
     } catch (error) {
-      updateTransaction(txId, { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Transaction failed' 
+      updateTransaction(txId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Transaction failed'
       });
     }
   };
 
   const handleReset = async () => {
-    const txId = `tx_${Date.now()}`;
-    addTransaction({
+    const txId = addTransaction({
       type: 'reset',
       status: 'pending',
     });
-    
+
     try {
-      await reset();
-      updateTransaction(txId, { status: 'success' });
+      const result = await reset();
+      updateTransaction(txId, {
+        status: 'success',
+        hash: result?.transactionId || undefined
+      });
     } catch (error) {
-      updateTransaction(txId, { 
-        status: 'error', 
-        error: error instanceof Error ? error.message : 'Transaction failed' 
+      updateTransaction(txId, {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Transaction failed'
       });
     }
   };
@@ -237,6 +247,7 @@ export default function Home() {
                   isLoading={contractLoading}
                   maxCount={contract.maxCount}
                   minCount={contract.minCount}
+                  onRefresh={refresh}
                 />
               )}
 
@@ -261,6 +272,67 @@ export default function Home() {
                 transactions={transactions}
                 network={APP_CONFIG.network}
               />
+
+              {/* Debug Section */}
+              {wallet?.walletType === 'metamask' && (
+                <div className="card">
+                  <div className="card-header">
+                    <h3 className="text-lg font-semibold">Debug Information</h3>
+                  </div>
+                  <div className="card-content space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <strong>Contract ID:</strong> {APP_CONFIG.contractId}
+                      </div>
+                      <div>
+                        <strong>Network:</strong> {APP_CONFIG.network}
+                      </div>
+                      <div>
+                        <strong>Wallet:</strong> {wallet?.accountId}
+                      </div>
+                      <div>
+                        <strong>Contract State:</strong> {contract ? 'Loaded' : 'Not loaded'}
+                      </div>
+                      <div>
+                        <strong>Loading:</strong> {contractLoading ? 'Yes' : 'No'}
+                      </div>
+                      <div>
+                        <strong>Error:</strong> {contractError || 'None'}
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          console.log('🔍 Manual refresh triggered');
+                          refresh();
+                        }}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        Debug Refresh
+                      </button>
+                      <button
+                        onClick={async () => {
+                          console.log('🔍 Manual contract test triggered');
+                          try {
+                            const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
+                            const contractAddress = hederaContractIdToEvmAddress(APP_CONFIG.contractId);
+                            console.log('🔍 Testing contract at:', contractAddress);
+                            const count = await metaMaskWallet.getContractCount(contractAddress);
+                            console.log('🔍 Contract count result:', count);
+                            alert(`Contract count: ${count}`);
+                          } catch (error) {
+                            console.error('🔍 Manual test failed:', error);
+                            alert(`Test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                          }
+                        }}
+                        className="btn btn-primary btn-sm"
+                      >
+                        Test Contract
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Contract Information */}
               {contract && (

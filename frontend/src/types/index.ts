@@ -63,6 +63,7 @@ export interface CounterDisplayProps {
   isLoading?: boolean;
   maxCount?: number;
   minCount?: number;
+  onRefresh?: () => void;
 }
 
 export interface WalletButtonProps {
@@ -182,13 +183,21 @@ export interface DecrementByFormData {
 
 // Hook Return Types (removed duplicate - using the one defined earlier)
 
+// Transaction result type
+export interface TransactionResult {
+  success: boolean;
+  transactionId?: string;
+  data?: any;
+  error?: string;
+}
+
 export interface UseContractReturn {
   contract: ContractInfo | null;
-  increment: () => Promise<void>;
-  decrement: () => Promise<void>;
-  incrementBy: (amount: number) => Promise<void>;
-  decrementBy: (amount: number) => Promise<void>;
-  reset: () => Promise<void>;
+  increment: () => Promise<TransactionResult | undefined>;
+  decrement: () => Promise<TransactionResult | undefined>;
+  incrementBy: (amount: number) => Promise<TransactionResult | undefined>;
+  decrementBy: (amount: number) => Promise<TransactionResult | undefined>;
+  reset: () => Promise<TransactionResult | undefined>;
   refresh: () => Promise<void>;
   clearError: () => void;
   isLoading: boolean;
@@ -197,7 +206,7 @@ export interface UseContractReturn {
 
 export interface UseTransactionsReturn {
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => void;
+  addTransaction: (transaction: Omit<Transaction, 'id' | 'timestamp'>) => string;
   updateTransaction: (id: string, updates: Partial<Transaction>) => void;
   clearTransactions: () => void;
   getTransactionsByStatus: (status: TransactionStatus) => Transaction[];

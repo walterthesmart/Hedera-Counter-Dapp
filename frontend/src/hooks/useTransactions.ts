@@ -12,7 +12,7 @@ export const useTransactions = (): UseTransactionsReturn => {
   // Add a new transaction
   const addTransaction = useCallback((
     transaction: Omit<Transaction, 'id' | 'timestamp'>
-  ) => {
+  ): string => {
     const newTransaction: Transaction = {
       ...transaction,
       id: generateTransactionId(),
@@ -24,6 +24,9 @@ export const useTransactions = (): UseTransactionsReturn => {
       // Keep only the most recent transactions
       return updated.slice(0, UI_CONFIG.MAX_TRANSACTIONS_HISTORY);
     });
+
+    // Return the generated ID so it can be used for updates
+    return newTransaction.id;
   }, []);
 
   // Update an existing transaction

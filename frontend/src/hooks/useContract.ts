@@ -38,11 +38,33 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       if (wallet?.walletType === 'metamask' && wallet.isConnected) {
         try {
           console.log('🦊 Fetching real contract state via MetaMask...');
+          console.log('🔍 Contract ID from config:', APP_CONFIG.contractId);
           const { metaMaskWallet, hederaContractIdToEvmAddress } = await import('@/utils/metamask');
           const contractAddress = hederaContractIdToEvmAddress(APP_CONFIG.contractId);
+          console.log('🔍 Converted EVM address:', contractAddress);
+
+          // First, test if we can connect to the provider
+          try {
+            const connection = metaMaskWallet.getConnection();
+            console.log('🔍 MetaMask connection status:', connection);
+
+            // Check what network we're connected to
+            const chainId = await metaMaskWallet.getChainId();
+            console.log('🔍 Current chain ID:', chainId);
+            console.log('🔍 Expected Hedera testnet chain ID: 0x128 (296)');
+
+            if (chainId !== '0x128') {
+              console.warn('⚠️ MetaMask is not connected to Hedera testnet!');
+              console.warn('⚠️ Current chain:', chainId, 'Expected: 0x128');
+            }
+          } catch (providerError) {
+            console.error('❌ Provider connection failed:', providerError);
+          }
 
           // Get real contract state
+          console.log('🔍 Calling debugContractState for address:', contractAddress);
           const debugInfo = await metaMaskWallet.debugContractState(contractAddress);
+          console.log('🔍 debugContractState result:', debugInfo);
 
           if (debugInfo && !debugInfo.error) {
             contractData = {
@@ -54,6 +76,39 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
               minCount: debugInfo.minCount,
             };
             console.log('✅ Real contract state loaded via MetaMask:', contractData);
+          } else {
+            console.warn('❌ Failed to get contract state via MetaMask:', debugInfo?.error);
+
+            // Try simpler approach - just get the count
+            console.log('🔄 Trying simpler getContractCount...');
+            try {
+              const count = await metaMaskWallet.getContractCount(contractAddress);
+              if (count !== null) {
+                contractData = {
+                  contractId: APP_CONFIG.contractId,
+                  count: count,
+                  owner: '0x0000000000000000000000000000000000000000', // Default
+                  isPaused: false,
+                  maxCount: 1000000,
+                  minCount: 0,
+                };
+                console.log('✅ Got count via simple method:', contractData);
+              } else {
+                throw new Error('getContractCount returned null');
+              }
+            } catch (simpleError) {
+              console.error('❌ Simple count method also failed:', simpleError);
+              // Final fallback to mock data
+              contractData = {
+                contractId: APP_CONFIG.contractId,
+                count: 0,
+                owner: '0x0000000000000000000000000000000000000000',
+                isPaused: false,
+                maxCount: 1000000,
+                minCount: 0,
+              };
+              console.log('🔄 Using final fallback contract data:', contractData);
+            }
           }
         } catch (metamaskError) {
           console.warn('MetaMask contract query failed:', metamaskError);
@@ -145,7 +200,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
     functionName: string,
     operation: () => Promise<any>,
     successMessage?: string
-  ) => {
+  ): Promise<any> => {
     console.log('executeContractFunction called:', {
       functionName,
       wallet: !!wallet,
@@ -201,6 +256,9 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
 
         // Also schedule a delayed refresh to ensure we get the latest state
         setTimeout(refresh, 1000);
+
+        // Return the result for transaction tracking
+        return result;
       } else {
         throw new Error(result?.error || 'Transaction failed');
       }
@@ -245,7 +303,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
-    await executeContractFunction(
+    return await executeContractFunction(
       'increment',
       async () => {
         console.log('Executing real increment transaction...');
@@ -285,7 +343,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
-    await executeContractFunction(
+    return await executeContractFunction(
       'decrement',
       async () => {
         console.log('Executing real decrement transaction...');
@@ -331,7 +389,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
-    await executeContractFunction(
+    return await executeContractFunction(
       'incrementBy',
       async () => {
         console.log(`Executing real incrementBy ${amount} transaction...`);
@@ -378,7 +436,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
-    await executeContractFunction(
+    return await executeContractFunction(
       'decrementBy',
       async () => {
         console.log(`Executing real decrementBy ${amount} transaction...`);
@@ -411,7 +469,7 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
-    await executeContractFunction(
+    return await executeContractFunction(
       'reset',
       () => walletManager.resetCounter(APP_CONFIG.contractId),
       'Counter reset successfully'

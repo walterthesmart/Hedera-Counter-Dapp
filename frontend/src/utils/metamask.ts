@@ -133,6 +133,18 @@ export class MetaMaskWallet {
   }
 
   /**
+   * Get current chain ID
+   */
+  async getChainId(): Promise<string | null> {
+    try {
+      return await this.provider.request({ method: 'eth_chainId' });
+    } catch (error) {
+      console.error('Failed to get chain ID:', error);
+      return null;
+    }
+  }
+
+  /**
    * Ensure MetaMask is connected to the correct Hedera network
    */
   async ensureCorrectNetwork(network: Exclude<HederaNetwork, 'previewnet'> = 'testnet'): Promise<void> {
@@ -421,12 +433,17 @@ export class MetaMaskWallet {
    */
   async getContractCount(contractAddress: string): Promise<number | null> {
     try {
+      console.log('🔍 getContractCount called for:', contractAddress);
       const contractABI = this.getCounterContractABI();
+      console.log('🔍 Contract ABI loaded, creating contract instance...');
       const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
+      console.log('🔍 Contract instance created, calling getCount()...');
       const count = await contract.getCount();
-      return count.toNumber();
+      const countNumber = count.toNumber();
+      console.log('✅ Contract count retrieved successfully:', countNumber);
+      return countNumber;
     } catch (error) {
-      console.error('Failed to get contract count:', error);
+      console.error('❌ Failed to get contract count:', error);
       return null;
     }
   }
@@ -626,27 +643,60 @@ export class MetaMaskWallet {
    */
   async debugContractState(contractAddress: string): Promise<any> {
     try {
+      console.log('🔍 Starting debugContractState for:', contractAddress);
       const contractABI = this.getCounterContractABI();
       const contract = new ethers.Contract(contractAddress, contractABI, this.provider);
 
-      const [count, owner, paused, maxCount, minCount] = await contract.getContractInfo();
+      console.log('🔍 Contract instance created, calling getContractInfo...');
 
-      const debugInfo = {
-        contractAddress,
-        currentCount: count.toNumber(),
-        owner: owner,
-        isPaused: paused,
-        maxCount: maxCount.toNumber(),
-        minCount: minCount.toNumber(),
-        connectedAccount: this.connection?.accountId,
-        network: this.connection?.network,
-        chainId: await this.provider.request({ method: 'eth_chainId' })
-      };
+      // Try to call getContractInfo
+      let debugInfo;
+      try {
+        const [count, owner, paused, maxCount, minCount] = await contract.getContractInfo();
 
-      console.log('🔍 Contract Debug Info:', debugInfo);
+        debugInfo = {
+          contractAddress,
+          currentCount: count.toNumber(),
+          owner: owner,
+          isPaused: paused,
+          maxCount: maxCount.toNumber(),
+          minCount: minCount.toNumber(),
+          connectedAccount: this.connection?.accountId,
+          network: this.connection?.network,
+          chainId: await this.provider.request({ method: 'eth_chainId' })
+        };
+        console.log('✅ getContractInfo succeeded:', debugInfo);
+      } catch (contractInfoError) {
+        console.warn('❌ getContractInfo failed, trying individual calls:', contractInfoError);
+
+        // Fallback: try individual function calls
+        try {
+          const count = await contract.getCount();
+          const owner = await contract.getOwner();
+          const isPaused = await contract.isPaused();
+
+          debugInfo = {
+            contractAddress,
+            currentCount: count.toNumber(),
+            owner: owner,
+            isPaused: isPaused,
+            maxCount: 1000000, // Default values
+            minCount: 0,
+            connectedAccount: this.connection?.accountId,
+            network: this.connection?.network,
+            chainId: await this.provider.request({ method: 'eth_chainId' })
+          };
+          console.log('✅ Individual calls succeeded:', debugInfo);
+        } catch (individualError) {
+          console.error('❌ Individual calls also failed:', individualError);
+          throw individualError;
+        }
+      }
+
+      console.log('🔍 Final Contract Debug Info:', debugInfo);
       return debugInfo;
     } catch (error) {
-      console.error('Failed to get contract debug info:', error);
+      console.error('❌ Failed to get contract debug info:', error);
       return { error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
