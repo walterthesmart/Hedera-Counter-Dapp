@@ -42,25 +42,42 @@ export const queryContract = async (
   parameters?: ContractFunctionParameters,
   network: HederaNetwork = APP_CONFIG.network
 ): Promise<ContractCallResult> => {
+  console.log(`Querying contract ${contractId} function ${functionName} on ${network}`);
   const client = createHederaClient(network);
-  
+
   try {
     const query = new ContractCallQuery()
       .setContractId(ContractId.fromString(contractId))
       .setGas(100000)
       .setFunction(functionName, parameters);
 
+    console.log('Executing contract query...');
     const result = await query.execute(client);
-    
+    console.log('Contract query successful');
+
     return {
       success: true,
       data: result,
     };
   } catch (error) {
-    console.error(`Contract query failed for ${functionName}:`, error);
+    console.error(`Contract query failed for ${functionName} on contract ${contractId}:`, error);
+
+    // Provide more specific error messages
+    let errorMessage = 'Unknown error';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      if (errorMessage.includes('CONTRACT_REVERT_EXECUTED')) {
+        errorMessage = 'Contract function reverted. The contract may not exist or the function may not be available.';
+      } else if (errorMessage.includes('INVALID_CONTRACT_ID')) {
+        errorMessage = 'Invalid contract ID. Please check if the contract is deployed correctly.';
+      } else if (errorMessage.includes('TIMEOUT')) {
+        errorMessage = 'Request timed out. Please try again.';
+      }
+    }
+
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
     };
   } finally {
     client.close();

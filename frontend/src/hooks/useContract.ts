@@ -22,24 +22,76 @@ export const useContract = (wallet: WalletConnection | null): UseContractReturn 
       return;
     }
 
+    console.log('Loading contract info for:', APP_CONFIG.contractId, 'on network:', APP_CONFIG.network);
     setIsLoading(true);
     setError(null);
 
     try {
-      const contractInfo = await retryOperation(
-        () => getContractInfo(APP_CONFIG.contractId, APP_CONFIG.network),
-        3,
-        1000
-      );
+      // For now, let's create a mock contract to test the UI
+      console.log('Creating mock contract for testing...');
 
-      if (contractInfo) {
-        setContract(contractInfo);
-      } else {
-        setError('Failed to fetch contract information');
+      setContract({
+        contractId: APP_CONFIG.contractId,
+        count: 42, // Mock count
+        owner: '0x0000000000000000000000000000000000000000',
+        isPaused: false,
+        maxCount: 1000000,
+        minCount: 0,
+      });
+
+      console.log('Mock contract created successfully');
+
+      // TODO: Uncomment this when we have a working contract
+      /*
+      // First, let's try to verify the contract exists using Mirror Node
+      const mirrorNodeUrl = `https://testnet.mirrornode.hedera.com/api/v1/contracts/${APP_CONFIG.contractId}`;
+      console.log('Checking contract existence via Mirror Node:', mirrorNodeUrl);
+
+      const mirrorResponse = await fetch(mirrorNodeUrl);
+      if (!mirrorResponse.ok) {
+        throw new Error(`Contract ${APP_CONFIG.contractId} not found on Mirror Node. Status: ${mirrorResponse.status}`);
       }
+
+      const mirrorData = await mirrorResponse.json();
+      console.log('Mirror Node contract data:', mirrorData);
+
+      // Try a simpler approach - just get the count first
+      console.log('Trying to get count from contract...');
+      const { getCounterValue } = await import('@/utils/hedera');
+      const count = await getCounterValue(APP_CONFIG.contractId, APP_CONFIG.network);
+
+      if (count !== null) {
+        console.log('Successfully got count:', count);
+        // If we can get the count, create a basic contract info object
+        setContract({
+          contractId: APP_CONFIG.contractId,
+          count: count,
+          owner: 'Unknown', // We'll get this later
+          isPaused: false, // We'll get this later
+          maxCount: 1000000, // Default from contract
+          minCount: 0, // Default from contract
+        });
+      } else {
+        // Try the full contract info function
+        console.log('Count failed, trying full contract info...');
+        const contractInfo = await retryOperation(
+          () => getContractInfo(APP_CONFIG.contractId, APP_CONFIG.network),
+          3,
+          1000
+        );
+
+        console.log('Contract info result:', contractInfo);
+
+        if (contractInfo) {
+          setContract(contractInfo);
+        } else {
+          setError(`Failed to fetch contract information for ${APP_CONFIG.contractId}. The contract exists but may not have the expected functions.`);
+        }
+      }
+      */
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      setError(errorMessage);
+      setError(`Contract connection failed: ${errorMessage}`);
       console.error('Contract refresh failed:', error);
     } finally {
       setIsLoading(false);
