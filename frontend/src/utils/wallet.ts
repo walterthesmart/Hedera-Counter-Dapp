@@ -71,10 +71,11 @@ class MockHederaWalletConnect {
       maxTransactionFee
     });
 
-    // Simulate transaction execution
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // For development, simulate successful transaction
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     return {
+      success: true,
       transactionId: `0.0.${Date.now()}@${Date.now()}.${Math.floor(Math.random() * 1000000)}`,
       status: 'SUCCESS',
       contractResult: {
@@ -230,10 +231,10 @@ export class HederaWalletConnectManager {
         maxTransactionFee
       );
 
-      if (result && result.transactionId) {
+      if (result && result.success) {
         return {
           success: true,
-          transactionId: result.transactionId.toString(),
+          transactionId: result.transactionId,
         };
       } else {
         throw new Error('Transaction execution failed');

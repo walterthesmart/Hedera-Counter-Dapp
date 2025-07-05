@@ -8,7 +8,6 @@ import { Github, ExternalLink, BookOpen } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useContract } from '@/hooks/useContract';
 import { useTransactions } from '@/hooks/useTransactions';
-import { WalletButton } from '@/components/WalletButton';
 import { CounterDisplay } from '@/components/CounterDisplay';
 import { CounterControls } from '@/components/CounterControls';
 import { TransactionHistory } from '@/components/TransactionHistory';
@@ -164,7 +163,7 @@ export default function Home() {
                 >
                   <Github className="w-5 h-5" />
                 </a>
-                
+
                 <a
                   href="/docs"
                   className="text-gray-600 hover:text-gray-900 transition-colors"
@@ -184,6 +183,43 @@ export default function Home() {
                     <ExternalLink className="w-5 h-5" />
                   </a>
                 )}
+
+                {/* MetaMask Connect Button */}
+                {wallet?.isConnected ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 px-3 py-1 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm font-medium text-green-700">
+                        {wallet.accountId.slice(0, 8)}...
+                      </span>
+                    </div>
+                    <button
+                      onClick={disconnect}
+                      className="p-1 text-gray-600 hover:text-gray-900 transition-colors"
+                      title="Disconnect Wallet"
+                    >
+                      <span className="text-sm">⏻</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => connect('metamask')}
+                    disabled={isConnecting}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
+                  >
+                    {isConnecting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🦊</span>
+                        <span>Connect MetaMask</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -192,16 +228,8 @@ export default function Home() {
         {/* Main Content */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Wallet & Counter */}
+            {/* Left Column - Counter */}
             <div className="lg:col-span-2 space-y-8">
-              {/* Wallet Connection */}
-              <WalletButton
-                onConnect={connect}
-                onDisconnect={disconnect}
-                wallet={wallet}
-                isConnecting={isConnecting}
-              />
-
               {/* Counter Display */}
               {contract && (
                 <CounterDisplay

@@ -190,6 +190,7 @@ export interface UseContractReturn {
   decrementBy: (amount: number) => Promise<void>;
   reset: () => Promise<void>;
   refresh: () => Promise<void>;
+  clearError: () => void;
   isLoading: boolean;
   error: string | null;
 }
